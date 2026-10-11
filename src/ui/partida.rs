@@ -513,7 +513,7 @@ impl Partida {
     /// separador decimal do idioma. Ver [`crate::velocidade::rotulo_do_avanco`].
     pub fn indicador_do_avanco(&self, avanco: &Avanco, virgula: bool) -> Option<String> {
         self.avancando.then(|| {
-            let alcancada = self.sessao.sample().speed as f32 / 100.0;
+            let alcancada = self.sessao.velocidade_alcancada();
             crate::velocidade::rotulo_do_avanco(avanco.proporcao(), alcancada, virgula)
         })
     }
