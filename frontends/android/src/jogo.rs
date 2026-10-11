@@ -650,7 +650,7 @@ impl Emulador {
             false => "◀◀".to_string(),
         });
         let avanco = (self.avancando)
-            .then(|| self.sessao.as_ref().map(|sessao| sessao.sample().speed as f32 / 100.0))
+            .then(|| self.sessao.as_ref().map(|sessao| sessao.velocidade_alcancada()))
             .flatten()
             .map(|alcancada| {
                 zeebx::velocidade::rotulo_do_avanco(
