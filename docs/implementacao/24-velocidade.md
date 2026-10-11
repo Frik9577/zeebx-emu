@@ -105,6 +105,14 @@ usada é a **alcançada**, numa média móvel de meio segundo, e não a pedida. 
 chegando a 4x, um passo de 10 deixaria o som duas vezes e meia na frente do jogo. A 1x o ritmo é
 exatamente 1, porque seguir a oscilação da medida desafinaria a música de quem nem está avançando.
 
+**A média parte da proporção pedida, e não de 1x.** O jogo acelera no aperto: no Action Hero 3D a
+3x, os primeiros 100 ms já andam 2,8x. Partindo de 1x, a média levava um segundo e meio para chegar
+perto dos 3x, e o som e o rótulo ▶▶ subiam devagar atrás do jogo. O fast-forward parecia gradual.
+Do segundo aperto em diante, com a mesma proporção, ela parte de onde parou da última vez. No mesmo
+jogo a 10x o host chega a 6,7x, e partir de 10 a cada aperto fazia a altura escorregar por um
+segundo e meio; medido de novo, o segundo aperto começa em 6,56x. O rótulo usa essa mesma média
+(`Session::velocidade_alcancada`), e não a amostra de meio segundo do painel.
+
 "Sem som" cala o mixer enquanto avança. "Sem limite" é sempre mudo: a velocidade real varia de
 quadro leve para quadro pesado, e o som que a acompanhasse mudaria de altura o tempo todo.
 
@@ -176,6 +184,19 @@ gravação faria o jogo continuar escrevendo de um deslocamento antigo por cima 
 mudou: o save do jogador. Um ponto que o motor recusa (um arquivo que o jogo apagou depois, por
 exemplo) sai do anel, e o anterior é tentado. **O que o jogo gravou no disco não volta**: voltar
 para antes de um save não desfaz o save, o mesmo que o save state manual faz.
+
+### O som que não voltava
+
+O mixer não entra no save state, e restaurar não mexia nele. Voltar no rewind deixava tocando o
+que o mixer tocava no instante de antes: a música da cena seguinte por cima da restaurada, para
+sempre quando era um laço, porque o jogo restaurado não sabe daquela voz e nunca a manda parar.
+Visto no Action Hero 3D, cuja música é MP3 em laço. O mesmo valia para o save state manual.
+
+Agora o restaurar cala o mixer inteiro e toca de novo o que o estado diz que toca
+(`Machine::refaz_o_som`). Um efeito volta do ponto que o relógio virtual marca, contando as
+repetições. Um laço volta do começo, porque o instante em que ele começou não é guardado. Um fluxo
+PCM volta vazio, e o jogo o enche de novo. Um som cujo cache não está na memória, num estado de
+outra sessão, fica calado até o jogo tocá-lo de novo, como já ficava.
 
 ### O relógio que não voltava
 
