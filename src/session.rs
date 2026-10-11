@@ -240,8 +240,13 @@ const BOTOES_COM_TECLA: [(&str, u32); 2] = [
 struct SomDoAvanco {
     /// O instante real e o relógio virtual da volta anterior.
     ultima: Option<(Instant, u64)>,
-    /// A velocidade alcançada, em média.
-    media: f64,
+    /// A velocidade alcançada, em média. `None` antes da primeira medida do sem limite.
+    media: Option<f64>,
+    /// A proporção pedida na volta anterior: trocar de proporção recomeça a média dela.
+    pedida: Option<Option<f32>>,
+    /// A última proporção acima de 1x e a média em que ela parou: é por onde o próximo aperto
+    /// com a mesma proporção começa.
+    lembrada: Option<(Option<f32>, f64)>,
     /// O último ritmo e o último abafado entregues ao mixer.
     enviado: Option<(f32, bool)>,
     /// Calado pelo rewind. Ver [`Session::cala`].
@@ -254,7 +259,9 @@ impl Default for SomDoAvanco {
     fn default() -> Self {
         Self {
             ultima: None,
-            media: 1.0,
+            media: Some(1.0),
+            pedida: None,
+            lembrada: None,
             enviado: None,
             calado: false,
             abafado_pelo_ritmo: false,
@@ -727,18 +734,36 @@ impl Session {
     /// aos estalos. A velocidade medida, numa média de meio segundo, mantém os dois juntos; ela
     /// oscila de quadro leve para quadro pesado, e a média é o que impede a altura de tremer.
     ///
+    /// **A média parte da proporção pedida, e não de 1x.** Partindo de 1x, ela levava um segundo e
+    /// meio para chegar perto dos 3x: o jogo acelerava na hora — medido no Action Hero 3D, 2,8x
+    /// já nos primeiros 100 ms —, e o som e o rótulo subiam devagar atrás dele, e o fast-forward
+    /// parecia gradual. Partindo do pedido, os dois saltam junto com o jogo, e a média só desce
+    /// quando o host não acompanha. Do segundo aperto em diante, com a mesma proporção, ela parte
+    /// de onde parou da última vez: no mesmo Action Hero a 10x o host chega a 6,7x, e partir de 10
+    /// a cada aperto fazia a altura escorregar por um segundo e meio. O sem limite não tem pedido:
+    /// parte da última vez, ou da primeira medida.
+    ///
     /// A 1x o som fica em exatamente 1: a medida oscila em torno disso, e seguir a oscilação
     /// desafinaria a música de quem nem está avançando.
     fn acompanha_o_som(&mut self, ritmo: &Ritmo) {
         let agora = Instant::now();
         let relogio = u64::from(self.machine.clock_ms());
         let som = &mut self.som_do_avanco;
-        let alvo = match ritmo.proporcao {
-            Some(1.0) => {
-                som.media = 1.0;
-                som.ultima = None;
-                1.0
+        if som.pedida != Some(ritmo.proporcao) {
+            if let (Some(pedida), Some(media)) = (som.pedida, som.media)
+                && pedida != Some(1.0)
+            {
+                som.lembrada = Some((pedida, media));
             }
+            som.pedida = Some(ritmo.proporcao);
+            som.media = match som.lembrada {
+                Some((pedida, media)) if pedida == ritmo.proporcao => Some(media),
+                _ => ritmo.proporcao.map(f64::from),
+            };
+            som.ultima = None;
+        }
+        let alvo = match ritmo.proporcao {
+            Some(1.0) => 1.0,
             _ => {
                 if let Some((antes, relogio_antes)) = som.ultima {
                     let dt = (agora - antes).as_secs_f64();
@@ -747,11 +772,16 @@ impl Session {
                     if dt > 0.0 && dt <= LACUNA_DO_SOM_S {
                         let instante = relogio.saturating_sub(relogio_antes) as f64 / 1000.0 / dt;
                         let peso = dt / (MEDIA_DO_SOM_S + dt);
-                        som.media += (instante - som.media) * peso;
+                        som.media = Some(match som.media {
+                            Some(media) => media + (instante - media) * peso,
+                            None => instante,
+                        });
                     }
                 }
                 som.ultima = Some((agora, relogio));
-                som.media.clamp(0.25, f64::from(crate::velocidade::Avanco::MAIOR) + 2.0)
+                som.media
+                    .unwrap_or(1.0)
+                    .clamp(0.25, f64::from(crate::velocidade::Avanco::MAIOR) + 2.0)
             }
         };
         som.abafado_pelo_ritmo = ritmo.abafa_o_som;
@@ -1510,6 +1540,19 @@ impl Session {
         }
     }
 
+    /// A velocidade que o jogo alcança, em vezes a do console, pela mesma média que o som segue
+    /// fora de 1x; a 1x, ou antes da primeira medida do sem limite, a da [`Session::sample`].
+    ///
+    /// É o número do rótulo ▶▶. A amostra mede janelas de meio segundo, e no aperto do
+    /// fast-forward mostrava 1x subindo até o pedido. Ver [`Session::acompanha_o_som`].
+    pub fn velocidade_alcancada(&self) -> f32 {
+        let media = match self.som_do_avanco.pedida {
+            Some(Some(1.0)) | None => None,
+            Some(_) => self.som_do_avanco.media,
+        };
+        media.map_or(self.sample.speed as f32 / 100.0, |media| media as f32)
+    }
+
     /// Assinatura do conteúdo da tela, para o frontend evitar reenvio de quadro repetido.
     pub fn screen_signature(&self) -> u64 {
         self.screen().signature()
@@ -1983,6 +2026,37 @@ pub(crate) mod tests {
         let visto = sessao.machine.pad_da_porta(0);
         assert!(!visto.is_down(b1), "sem turbo, volta ao cru");
         assert!(visto.is_down(up));
+    }
+
+    /// O fast-forward começa na proporção pedida: a média do som e do rótulo não sobe de 1x aos
+    /// poucos. Sem pedido — o sem limite —, ela espera a primeira medida.
+    #[test]
+    fn o_avanco_comeca_na_proporcao_pedida() {
+        let mut sessao = sessao_minima_para_save_state();
+        assert_eq!(sessao.velocidade_alcancada(), 0.0, "a 1x vale a amostra, ainda vazia");
+
+        let tres = Ritmo { proporcao: Some(3.0), ..Ritmo::CONSOLE };
+        sessao.acompanha_o_som(&tres);
+        assert_eq!(sessao.velocidade_alcancada(), 3.0);
+        assert_eq!(sessao.som_do_avanco.enviado, Some((3.0, false)));
+
+        // Voltar a 1x zera a média, e o pedido seguinte parte dele de novo.
+        sessao.acompanha_o_som(&Ritmo::CONSOLE);
+        assert_eq!(sessao.som_do_avanco.enviado, Some((1.0, false)));
+        let dez = Ritmo { proporcao: Some(10.0), ..Ritmo::CONSOLE };
+        sessao.acompanha_o_som(&dez);
+        assert_eq!(sessao.velocidade_alcancada(), 10.0);
+
+        // O próximo aperto com a mesma proporção parte de onde ela parou.
+        sessao.som_do_avanco.media = Some(6.5);
+        sessao.acompanha_o_som(&Ritmo::CONSOLE);
+        sessao.acompanha_o_som(&dez);
+        assert_eq!(sessao.velocidade_alcancada(), 6.5);
+        sessao.acompanha_o_som(&tres);
+        assert_eq!(sessao.velocidade_alcancada(), 3.0, "a lembrança é da proporção dela");
+
+        sessao.acompanha_o_som(&Ritmo::SEM_FREIO);
+        assert_eq!(sessao.som_do_avanco.media, None, "sem limite não tem por onde começar");
     }
 
     #[test]
