@@ -287,6 +287,8 @@ impl<C: CpuBackend> Machine<C> {
         if let Some(tempo_pulado) = tempo_pulado {
             self.clock_us = tempo_pulado;
         }
+        // Com o relógio já no lugar: o som de cada efeito volta do ponto que ele marca.
+        self.refaz_o_som();
         Ok(())
     }
 }
@@ -2102,7 +2104,8 @@ impl<C: CpuBackend> Machine<C> {
 /// - **`vfs`** e **`resources`**: são **cache do que está em disco** (o sistema de arquivos do
 ///   aparelho e os recursos do pacote). Derrubá-los faz recarregar, e é o certo: gravar seria
 ///   duplicar o pacote dentro do save state;
-/// - **`audio`**: o `Mixer` do host. O que o jogo pediu está nos `sounds`, e o mixer se refaz;
+/// - **`audio`**: o `Mixer` do host. O que o jogo pediu está nos `media`, e o mixer se refaz deles
+///   ao restaurar: ver [`Machine::refaz_o_som`];
 /// - **`ignored_gl`**, **`api_time`**, **`profiling_api`**, **`tracing`**, **`fault_*`**: instrumento
 ///   e diagnóstico, pela mesma razão de sempre — salvar faria dois save states legitimamente
 ///   diferentes.
@@ -3905,6 +3908,59 @@ mod tests {
         assert_eq!(midia.buffer, (0x12, 0x13));
         assert_eq!(midia.ends_us, 0x2_0000_000b);
         assert_eq!(midia.notify.function, 0x1000_7000);
+    }
+
+    /// **O mixer volta ao que o estado restaurado toca.** O que ele tocava depois do ponto salvo
+    /// sai — um laço ficaria para sempre, porque o jogo restaurado não sabe dele —, e o que o
+    /// estado diz que toca volta: o laço do começo, o efeito do ponto em que o relógio o deixou.
+    #[test]
+    fn restaurar_refaz_o_som_do_estado() {
+        let som = std::sync::Arc::new(crate::audio::wav::Sound {
+            rate: 1_000,
+            channels: 1,
+            samples: vec![0.5; 1_000],
+        });
+        let mut maquina = maquina();
+        let mixer = crate::audio::Mixer::silent(1_000);
+        maquina.set_audio(Some(mixer.clone()));
+        maquina.cargas_de_midia.insert(
+            7,
+            crate::machine::CargaDeMidia {
+                som: Some(som.clone()),
+                silencio_us: None,
+            },
+        );
+        let agora = maquina.now_us();
+        let tocando = |repeat, ends_us| MediaState {
+            state: crate::machine::MM_STATE_PLAY,
+            carga: 7,
+            repeat,
+            ends_us,
+            ..MediaState::default()
+        };
+        // A música em laço e um efeito de um segundo com 0,4 s por tocar.
+        maquina.media.insert(0xa00, tocando(0, u64::MAX));
+        maquina.media.insert(0xb00, tocando(1, agora + 400_000));
+        // Um efeito que já acabou para o relógio não volta.
+        maquina.media.insert(0xc00, tocando(1, agora));
+        let arquivo = maquina.grava_estado();
+
+        // Depois do ponto salvo, outra música começou noutra voz.
+        mixer.play(0xd00, som, 1.0, 0);
+        maquina.restaura_estado(&arquivo).expect("restaurou");
+
+        assert!(!mixer.is_playing(0xd00), "a música de depois do ponto continuou tocando");
+        assert!(mixer.is_playing(0xa00), "o laço do estado não voltou");
+        assert!(!mixer.is_playing(0xc00), "um efeito já acabado voltou a tocar");
+        let mut quadros = 0usize;
+        while mixer.is_playing(0xb00) && quadros < 5_000 {
+            let _ = mixer.render(10);
+            quadros += 10;
+        }
+        assert!(
+            quadros.abs_diff(400 + 64) <= 20,
+            "o efeito devia tocar só os 0,4 s que faltavam, e tocou {quadros} quadros"
+        );
     }
 
     /// **O resto: escalares, GL, IGraphics, teclados e threads** — e a conta de campos certa.
