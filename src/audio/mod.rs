@@ -326,6 +326,13 @@ impl Mixer {
     ///
     /// `repeat` segue o `MM_PARM_PLAY_REPEAT` do BREW: 1 toca uma vez, 0 toca para sempre.
     pub fn play(&self, id: u32, sound: Arc<Sound>, volume: f32, repeat: u32) {
+        self.play_desde(id, sound, volume, repeat, 0);
+    }
+
+    /// O [`Mixer::play`] com `desde_us` microssegundos do som já tocados, contando as repetições:
+    /// é o que um save state restaurado no meio de um efeito pede. Ver
+    /// [`crate::machine::Machine::restaura_estado`].
+    pub fn play_desde(&self, id: u32, sound: Arc<Sound>, volume: f32, repeat: u32, desde_us: u64) {
         let Ok(mut state) = self.state.lock() else {
             return;
         };
@@ -365,23 +372,40 @@ impl Mixer {
                 volume
             );
         }
+        // O que já tocou, em quadros do som: as voltas inteiras saem das repetições, e o resto é a
+        // posição dentro da volta em curso.
+        let quadros = sound.frames().max(1) as u64;
+        let tocados = desde_us.saturating_mul(u64::from(sound.rate)) / 1_000_000;
+        let voltas = u32::try_from(tocados / quadros).unwrap_or(u32::MAX);
         state.voices.insert(
             id,
             Voice {
-                tocados: 0.0,
+                tocados: tocados as f64,
                 descida: 0,
+                position: (tocados % quadros) as f64,
                 sound,
-                position: 0.0,
                 step,
                 volume,
                 remaining: match repeat {
                     0 => None,
-                    times => Some(times),
+                    times => Some(times.saturating_sub(voltas).max(1)),
                 },
                 paused: false,
                 done: false,
             },
         );
+    }
+
+    /// Cala todas as vozes e fecha todos os fluxos, de uma vez.
+    ///
+    /// É o que o save state restaurado pede: o que o mixer tocava era do instante de antes do
+    /// `Load`, e o jogo restaurado não sabe que aquilo existe — um som em laço ficaria tocando
+    /// para sempre, porque ninguém mais mandaria pará-lo.
+    pub fn para_tudo(&self) {
+        if let Ok(mut state) = self.state.lock() {
+            state.voices.clear();
+            state.streams.clear();
+        }
     }
 
     /// Abre na voz `id` um fluxo de `rate` Hz e `channels` canais, vazio.
@@ -814,6 +838,27 @@ mod tests {
                 "canais {canais}: tocou {total} quadros, esperado {esperado} (som de {quadros})"
             );
         }
+    }
+
+    /// Uma voz que começa do meio toca só o que falta, contando as repetições já tocadas. E o
+    /// "parar tudo" leva vozes e fluxos juntos.
+    #[test]
+    fn a_voz_comeca_do_meio_e_para_tudo_cala_tudo() {
+        let mixer = mixer(1_000);
+        // Um som de um segundo, três vezes, com 2,5 s já tocados: falta meio segundo.
+        mixer.play_desde(1, tone(1_000, 1_000), 1.0, 3, 2_500_000);
+        let mut total = 0usize;
+        while mixer.is_playing(1) && total < 10_000 {
+            let _ = mixer.render(50);
+            total += 50;
+        }
+        let esperado = 500 + DESCIDA_FRAMES as usize;
+        assert!(total.abs_diff(esperado) <= 50, "tocou {total} quadros, esperado {esperado}");
+
+        mixer.play(2, tone(1_000, 1_000), 1.0, 0);
+        mixer.open_stream(3, 1_000, 1, 1.0);
+        mixer.para_tudo();
+        assert!(!mixer.is_playing(2) && !mixer.is_playing(3));
     }
 
     /// A 3x a voz acaba na terça parte do tempo, que é quando o jogo — pelo relógio virtual —
