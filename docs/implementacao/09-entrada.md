@@ -312,6 +312,42 @@ não pode impedir o emulador de abrir: a falha vira "nenhum controle" e o teclad
 Os botões vêm antes dos eixos na captura: quem aperta o direcional de cruz de um controle que
 também o reporta como eixo quer o botão, que é o mais específico.
 
+### O controle religado com o emulador aberto
+
+Um Pro Controller desligado e religado com o emulador aberto não voltava: só reiniciando. O
+`gilrs` só tenta abrir um aparelho no `add` do udev, e com o `joycond`, comum no Arch e derivados,
+o nó de um controle da Nintendo nasce fechado. Medido em 2026-10-11, com um monitor do udev que
+abria o nó como o `gilrs` abre:
+
+| Instante | Evento | Nó | Abrir |
+|---|---|---|---|
+| 23,67 s | `add` (etiqueta `joycond`) | `crw-------` | `EACCES` |
+| 24,17 s | — | `crw-------` | `EACCES` |
+| 24,81 s | `change` (etiqueta `uaccess`) | `crw-rw-rw-` | abre |
+
+O `gilrs` ignora o `change`. Na abertura do emulador, o controle já está liberado, e a busca
+inicial do `gilrs` o encontra: por isso reiniciar resolvia.
+
+No Linux, `Gamepads::poll` confere uma vez por segundo quais nós `event*` de `/dev/input` o
+processo consegue abrir (`access`, que respeita as ACLs do udev). Um nó que passa a abrir é
+anotado. Se até a conferência seguinte o `gilrs` não conectou controle nenhum, ele não viu aquele
+nó, e é criado de novo. **Só nesse caso**: recriar reordena a lista, e uma porta sem controle
+escolhido pega o da posição dela. Um controle comum o `gilrs` conecta sozinho no `add`, e a lista
+fica como está. Medido com um controle virtual (`uinput`): a ordem não muda.
+
+### O que o registro diz dos controles
+
+Com a gravação da sessão ligada, o registro diz os controles que o `gilrs` vê ao abrir (nome,
+nome do sistema, VID/PID e se há mapeamento SDL), cada conexão e desconexão, e o primeiro evento
+de cada controle com o código cru, inclusive de um botão que o mapeamento não nomeia. Uma captura
+que espera mais de 5 s sem sinal de controle nenhum mostra uma dica na própria aba: o cabo USB, o
+Steam e o PS Remote Play, que seguram o controle, e parear de novo.
+
+É o diagnóstico da issue #59, o controle de PS4 num Mac M4 que a captura não via. Sem mapeamento,
+o `gilrs` do macOS ainda nomeia os botões crus de 1 a 21 pela posição, então um DS4 que chegasse ao
+emulador seria capturado, com os botões trocados. A captura esperando para sempre quer dizer que
+nada chegou: o controle não abriu, ou outro programa o segura. O relatório é o que separa os dois.
+
 ## As duas portas
 
 O Zeebo tem **duas portas USB**, e o console as enumera: o `GetConnectedDevices` da Z-Wheel
