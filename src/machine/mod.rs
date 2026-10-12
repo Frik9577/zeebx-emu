@@ -2710,6 +2710,9 @@ pub struct Machine<C: CpuBackend> {
     /// coisa — essa só acontece quando o desenho 2D por cima ou uma leitura de pixels precisa
     /// dela.
     gl_quadro_pendente: bool,
+    /// Um estado acabou de ser restaurado, e a textura da placa não tem o quadro dele. Ver
+    /// [`Machine::quadro_na_placa`].
+    placa_sem_o_quadro: bool,
     /// Quantas vezes o quadro pendente foi trazido para a tela da CPU. Ver
     /// [`Machine::materializacoes_do_quadro_gl`].
     gl_materializacoes: u32,
@@ -3270,6 +3273,7 @@ impl<C: CpuBackend> Machine<C> {
             audio: None,
             gl_last_frame_words: Vec::new(),
             gl_quadro_pendente: false,
+            placa_sem_o_quadro: false,
             gl_materializacoes: 0,
             gl: rasterizador(SCREEN_WIDTH as usize, SCREEN_HEIGHT as usize),
             gl_vertices: ArrayPointer::default(),
