@@ -829,8 +829,12 @@ impl Nucleo {
         // O fast-forward é da sessão, e não de uma porta: a tecla ou o botão de qualquer
         // controle. Ver `docs/implementacao/24-velocidade.md`.
         // O rewind vem antes: voltando, o jogo não anda e o fast-forward fica suspenso.
+        //
+        // **Com o contexto do jogo corrente.** Voltar um ponto restaura o estado, e o estado
+        // refaz as texturas na placa. Fora do `no_contexto`, elas eram apagadas e criadas no
+        // contexto que estivesse corrente — o do Qt Quick, ou nenhum —, e o rewind não funcionava.
         let voltar = self.entrada.atalho_apertado(&self.settings.atalhos.voltar, &self.teclas);
-        partida.le_o_rewind(voltar, &valendo.velocidade.rewind);
+        no_contexto(self.gl.is_some(), || partida.le_o_rewind(voltar, &valendo.velocidade.rewind));
         let apertado = self.entrada.atalho_apertado(&self.settings.atalhos.avancar, &self.teclas);
         let avancando = partida.le_o_avanco(apertado, valendo.velocidade.avanco.modo);
         let ritmo = valendo.velocidade.ritmo_com(avancando);
