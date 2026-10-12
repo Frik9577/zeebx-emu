@@ -89,6 +89,16 @@ pub mod qobject {
         #[qinvokable]
         fn pausa(self: Pin<&mut Self>) -> bool;
 
+        /// Se o `Qt::Key` é o atalho de reiniciar. Ver `atalhos.reiniciar`.
+        #[qinvokable]
+        #[cxx_name = "ehAtalhoDeReinicio"]
+        fn eh_atalho_de_reinicio(self: &Self, codigo: i32) -> bool;
+
+        /// Recomeça o jogo aberto. Devolve se recomeçou; falhando, o de antes continua, e a
+        /// linha de estado diz por quê.
+        #[qinvokable]
+        fn reinicia(self: Pin<&mut Self>) -> bool;
+
         /// Relê o título do jogo aberto para a linha de estado. A janela chama isto ao aparecer.
         #[qinvokable]
         fn atualiza(self: Pin<&mut Self>);
@@ -363,6 +373,34 @@ impl qobject::TelaDoJogo {
             nucleo.alterna_pausa();
             nucleo.pausada()
         })
+    }
+
+    pub fn eh_atalho_de_reinicio(&self, codigo: i32) -> bool {
+        tecla_do_qt(codigo).is_some_and(|tecla| nucleo::com(|nucleo| nucleo.e_atalho_de_reinicio(tecla)))
+    }
+
+    pub fn reinicia(mut self: Pin<&mut Self>) -> bool {
+        let (resultado, estado) = nucleo::com(|nucleo| {
+            let resultado = nucleo.reinicia();
+            let estado = match &resultado {
+                Ok(()) => nucleo.estado(),
+                Err(erro) => format!("não reiniciou: {erro}"),
+            };
+            (resultado, estado)
+        });
+        self.as_mut().set_estado(QString::from(&estado));
+        if resultado.is_err() {
+            return false;
+        }
+        // **A textura da partida que acabou não existe mais**, como no `fecha`: o nó não pode
+        // continuar apontando para ela. Apontando, o Qt desenhava um quadro com o número dela — e
+        // a partida nova já tinha dado esse número a outra textura: por um quadro aparecia a
+        // fonte do menu do jogo, em vermelho, no Resident Evil 4, no Ridge Racer e no Rolimã. A
+        // próxima volta manda a imagem nova.
+        self.as_mut().esvazia();
+        self.as_mut().rust_mut().chave = None;
+        self.as_mut().set_parou(QString::default());
+        true
     }
 
     pub fn atualiza(mut self: Pin<&mut Self>) {
