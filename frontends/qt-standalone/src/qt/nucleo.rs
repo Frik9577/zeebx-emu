@@ -120,6 +120,8 @@ pub struct Nucleo {
     /// de controles continua servindo pela lista.
     pub arte: Option<PadArt>,
     partida: Option<Partida>,
+    /// De onde a partida aberta foi aberta: é o que o [`Nucleo::reinicia`] abre de novo.
+    caminho_aberto: Option<PathBuf>,
     /// As configurações do jogo aberto, quando ele tem as próprias: a global com as seções dele
     /// por cima. É daqui, e não de `settings`, que o passo lê os controles e o ritmo. Ver
     /// [`ConfigDoJogo`].
@@ -198,6 +200,7 @@ impl Nucleo {
                 .inspect_err(|erro| eprintln!("desenho do controle: {erro:?}"))
                 .ok(),
             partida: None,
+            caminho_aberto: None,
             personalizadas: None,
             edicao: None,
             editando: None,
@@ -685,6 +688,7 @@ impl Nucleo {
             .map_err(|erro| erro.to_string())?;
         // A de antes sai aqui, e com o contexto corrente: as texturas dela moram nele.
         self.personalizadas = personalizadas;
+        self.caminho_aberto = Some(caminho.to_path_buf());
         no_contexto(com_placa, || self.partida = Some(partida));
         Ok(())
     }
@@ -695,6 +699,7 @@ impl Nucleo {
         if self.partida.is_some() {
             no_contexto(self.gl.is_some(), || self.partida = None);
             self.personalizadas = None;
+            self.caminho_aberto = None;
         }
         self.teclas.clear();
     }
@@ -750,6 +755,30 @@ impl Nucleo {
     /// A janela do jogo perdeu o foco: nenhuma tecla continua apertada.
     pub fn solta_teclas(&mut self) {
         self.teclas.clear();
+    }
+
+    /// Recomeça o jogo aberto, do zero, como se ele tivesse acabado de ser escolhido.
+    ///
+    /// **É abrir o mesmo caminho de novo**, e não um reset da máquina: a abertura é o único
+    /// caminho que monta tudo como o jogo espera — as configurações dele, as portas, o som, a
+    /// Z-Wheel de onde ele veio. O que o jogo gravou no disco fica; o que não gravou se perde,
+    /// como no botão de reset de um console. Falhando, a partida de antes continua.
+    pub fn reinicia(&mut self) -> Result<(), String> {
+        let Some(caminho) = self.caminho_aberto.clone() else {
+            return Err("nenhum jogo aberto".to_string());
+        };
+        let pela_z_wheel = self.partida.as_ref().is_some_and(|p| p.aberta_pela_z_wheel);
+        self.abre(&caminho)?;
+        if let Some(partida) = self.partida.as_mut() {
+            partida.aberta_pela_z_wheel = pela_z_wheel;
+            partida.reinicia_relogio();
+        }
+        Ok(())
+    }
+
+    /// Se a tecla é a de reiniciar. Como a do screenshot, é perguntada antes do jogo.
+    pub fn e_atalho_de_reinicio(&self, tecla: Key) -> bool {
+        Key::from_name(&self.settings.atalhos.reiniciar) == Some(tecla)
     }
 
     /// Se a tecla é a do screenshot. A janela do jogo pergunta antes de passá-la ao jogo: o
