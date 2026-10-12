@@ -52,6 +52,11 @@ impl Emulador {
             }
         }
         if !self.confirmando {
+            // Voltar um ponto refaz as texturas na placa, e a janela pintou no mesmo contexto
+            // desde o passo anterior: o mesmo aviso de antes de andar, logo abaixo.
+            if voltar && self.settings.velocidade.rewind.ligado {
+                sessao.retoma_o_contexto();
+            }
             let leitura =
                 self.rewind
                     .le(sessao, voltar, self.pausado, &self.settings.velocidade.rewind);
