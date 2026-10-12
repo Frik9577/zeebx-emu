@@ -489,7 +489,16 @@ impl Partida {
     /// Lê o atalho do rewind desta volta. Vem **antes** do [`Partida::le_o_avanco`] e do
     /// [`Partida::avanca`]: voltando, o jogo não anda e o fast-forward fica suspenso. Ver
     /// [`ControleDoRewind::le`].
+    ///
+    /// **Voltar um ponto é GL**, como andar: o estado restaurado refaz as texturas na placa. Quem
+    /// chama deixa o contexto do rasterizador corrente — o Qt chamava isto fora dele, e as
+    /// texturas do ponto iam parar no contexto do Qt Quick. E, como no [`Partida::avanca`], a
+    /// janela pode ter pintado no mesmo contexto desde o passo anterior: o espelho do estado da
+    /// placa é avisado antes.
     pub fn le_o_rewind(&mut self, apertado: bool, ajustes: &AjustesDoRewind) {
+        if apertado && ajustes.ligado {
+            self.sessao.retoma_o_contexto();
+        }
         let leitura = self.rewind.le(&mut self.sessao, apertado, self.pausada, ajustes);
         if leitura == Leitura::Soltou {
             self.reinicia_relogio();
