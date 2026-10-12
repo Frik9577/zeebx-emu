@@ -1070,6 +1070,7 @@ impl<C: CpuBackend> Machine<C> {
         self.gl.descarrega_o_desenho();
         self.gl.fecha_quadro();
         self.gl_quadro_pendente = true;
+        self.placa_sem_o_quadro = false;
         // **O quadro na placa vale para a tela como ela está agora**, mesmo sem ter sido lido. É o
         // que o [`Machine::quadro_na_placa`] compara, e quem apresenta pela placa nunca materializa
         // — a textura é justamente o que dispensa a leitura. Marcado só na materialização, o
@@ -1140,8 +1141,15 @@ impl<C: CpuBackend> Machine<C> {
     /// desenho 2D depois disso — um HUD pelo `IDisplay`, uma caixa de mensagem — vive só na tela
     /// do console, e mostrar a textura grande o apagaria. Nesse caso a janela fica com a tela de
     /// 640×480, como sempre.
+    ///
+    /// **Nem logo depois de restaurar um estado.** A textura da placa não entra no save state, e
+    /// volta vazia; a tela da CPU volta com a imagem gravada. Como o contador de escritas da tela
+    /// volta junto, a tela parecia intacta, e a janela mostrava a textura: preto. No rewind, que
+    /// segura o jogo parado em cada ponto, a tela ficava preta do começo ao fim — medido no Magical
+    /// Drop III e no Um Jogo de Ovos, pela placa. Até a próxima troca de buffer vale a tela.
     pub fn quadro_na_placa(&self) -> Option<crate::video::rasterizer::QuadroNaPlaca> {
-        let intacta = self.escritas_do_quadro_gl == Some(self.screen().escritas());
+        let intacta = !self.placa_sem_o_quadro
+            && self.escritas_do_quadro_gl == Some(self.screen().escritas());
         intacta.then(|| self.gl.quadro_na_placa()).flatten()
     }
 
