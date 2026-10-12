@@ -289,6 +289,10 @@ impl<C: CpuBackend> Machine<C> {
         }
         // Com o relógio já no lugar: o som de cada efeito volta do ponto que ele marca.
         self.refaz_o_som();
+        // A textura da placa não volta com o estado: até a próxima troca de buffer, a imagem é a
+        // da tela restaurada. Ver [`Machine::quadro_na_placa`].
+        self.placa_sem_o_quadro = true;
+        self.gl_quadro_pendente = false;
         Ok(())
     }
 }
@@ -3908,6 +3912,20 @@ mod tests {
         assert_eq!(midia.buffer, (0x12, 0x13));
         assert_eq!(midia.ends_us, 0x2_0000_000b);
         assert_eq!(midia.notify.function, 0x1000_7000);
+    }
+
+    /// **Depois de restaurar, a imagem é a da tela, e não a da placa.** A textura da placa não
+    /// entra no estado e volta vazia; até a próxima troca de buffer, a janela mostra a tela
+    /// restaurada. Um quadro pendente de antes do `Load` também não pode cair por cima dela.
+    #[test]
+    fn restaurar_deixa_a_imagem_na_tela_ate_a_proxima_troca() {
+        let mut maquina = maquina();
+        let arquivo = maquina.grava_estado();
+        maquina.gl_quadro_pendente = true;
+        maquina.restaura_estado(&arquivo).expect("restaurou");
+        assert!(maquina.placa_sem_o_quadro, "a janela mostraria a textura vazia da placa");
+        assert!(!maquina.gl_quadro_pendente, "o quadro de antes do Load cairia por cima da tela");
+        assert!(maquina.quadro_na_placa().is_none());
     }
 
     /// **O mixer volta ao que o estado restaurado toca.** O que ele tocava depois do ponto salvo
