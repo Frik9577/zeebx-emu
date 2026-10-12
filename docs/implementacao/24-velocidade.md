@@ -259,9 +259,22 @@ save state do Android e do core.
 A aba **Atalhos** do Qt junta todas as teclas da janela do jogo num lugar só, como o *Hotkey
 Settings* do Dolphin:
 
-- **Trocáveis**: o screenshot (só teclado, F9), o fast-forward (F10) e o rewind (F8). Os dois
-  últimos aceitam uma tecla ou um botão de qualquer controle ligado.
+- **Trocáveis**: o screenshot (só teclado, F9), o fast-forward (F10), o rewind (F8) e o reiniciar
+  (só teclado, R). O fast-forward e o rewind aceitam uma tecla ou um botão de qualquer controle
+  ligado.
 - **Fixos**, só para leitura: Esc, P, F11.
+
+**O reiniciar abre o mesmo jogo de novo**, na hora, sem confirmação, como o botão de reset de um
+console (`Nucleo::reinicia`). Não é um reset da máquina: a abertura é o único caminho que monta
+tudo como o jogo espera — as configurações dele, as portas, o som, a Z-Wheel de onde ele veio. O
+que o jogo gravou no disco fica. Como o screenshot, ele recusa uma tecla que já é botão do Zeebo, e
+é perguntado antes do jogo. Quem já usava o R num botão, num arquivo de antes do atalho, ganha o
+reiniciar **sem tecla** (`Settings::adota_o_atalho_de_reiniciar`), em vez de perder o botão. No
+Android, o "Reiniciar" fica na caixa do voltar, ao lado de pausar.
+
+A pausa mostra um **⏸** no centro da tela, com a palavra embaixo; continuar mostra um **▶** por meio
+segundo, e o reiniciar um **↻**, que somem esmaecendo. São desenhados com `Shape`, e não com
+caracteres: nem toda fonte tem o ⏸ e o ↻.
 
 Um botão que é de atalho **não chega ao jogo** (`Atalhos::reservadas`). Se ele também for um botão
 do Zeebo, o editor avisa, mas deixa salvar. Os padrões são só de teclado: o controle do Zeebo usa
