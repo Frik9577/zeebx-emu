@@ -41,6 +41,7 @@
   "controls.art_hint": "Press a button to see it light up, or click a part to reassign it.",
   "controls.assign": "Add",
   "controls.assigning": "Press a key or button…  (Esc cancels)",
+  "controls.no_signal": "No controller signal has reached the emulator since the click. If the controller doesn't show up or respond: try a USB cable, close Steam and PS Remote Play, or pair it again with the emulator open. With session recording on (Debug), the report lists the controllers the emulator sees.",
   "controls.axes": "Analog sticks",
   "controls.axes.hint": "Four axes, and the left stick feeds the first two. The D-pad does **not** write to them: on the console it is a button, and a game that only listens to the axis never sees it — for those there is the option above.",
   "controls.axis.none": "None",

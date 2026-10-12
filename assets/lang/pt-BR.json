@@ -41,6 +41,7 @@
   "controls.art_hint": "Aperte um botão para vê-lo acender, ou clique numa peça para remapeá-la.",
   "controls.assign": "Acrescentar",
   "controls.assigning": "Aperte uma tecla ou um botão…  (Esc cancela)",
+  "controls.no_signal": "Nenhum sinal de controle chegou ao emulador desde o clique. Se o controle não aparece ou não responde: tente pelo cabo USB, feche o Steam e o PS Remote Play, ou pareie de novo com o emulador aberto. Com a gravação da sessão ligada (Depuração), o relatório lista os controles que o emulador vê.",
   "controls.axes": "Analógicos",
   "controls.axes.hint": "Quatro eixos, e o manche esquerdo alimenta os dois primeiros. O direcional **não** escreve neles: no console ele é botão, e um jogo que só escuta o eixo não o enxerga — para esses há a opção acima.",
   "controls.axis.none": "Nenhum",
