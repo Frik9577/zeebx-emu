@@ -958,7 +958,8 @@ ApplicationWindow {
                         model: [
                             ["screenshot", "controls.shortcut.screenshot", "controls.shortcut.waiting", "controls.shortcut.reset"],
                             ["avancar", "controls.shortcut.fast_forward", "controls.shortcut.waiting_any", "controls.shortcut.reset_ff"],
-                            ["voltar", "controls.shortcut.rewind", "controls.shortcut.waiting_any", "controls.shortcut.reset_rewind"]
+                            ["voltar", "controls.shortcut.rewind", "controls.shortcut.waiting_any", "controls.shortcut.reset_rewind"],
+                            ["reiniciar", "controls.shortcut.restart", "controls.shortcut.waiting", "controls.shortcut.reset_restart"]
                         ]
 
                         RowLayout {
