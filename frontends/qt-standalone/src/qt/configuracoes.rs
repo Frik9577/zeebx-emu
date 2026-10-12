@@ -515,6 +515,8 @@ enum Atalho {
     Avancar,
     /// Como o fast-forward.
     Voltar,
+    /// Reiniciar o jogo aberto: só teclado, como o screenshot.
+    Reiniciar,
 }
 
 impl Atalho {
@@ -523,6 +525,7 @@ impl Atalho {
             "screenshot" => Some(Self::Screenshot),
             "avancar" => Some(Self::Avancar),
             "voltar" => Some(Self::Voltar),
+            "reiniciar" => Some(Self::Reiniciar),
             _ => None,
         }
     }
@@ -533,6 +536,7 @@ impl Atalho {
             Self::Screenshot => "controls.shortcut.screenshot",
             Self::Avancar => "controls.shortcut.fast_forward",
             Self::Voltar => "controls.shortcut.rewind",
+            Self::Reiniciar => "controls.shortcut.restart",
         }
     }
 
@@ -542,20 +546,21 @@ impl Atalho {
             Self::Screenshot => Key::from_name(&atalhos.screenshot) == Some(tecla),
             Self::Avancar => atalhos.avancar.iter().any(|fonte| e_a_tecla(fonte, tecla)),
             Self::Voltar => atalhos.voltar.iter().any(|fonte| e_a_tecla(fonte, tecla)),
+            Self::Reiniciar => Key::from_name(&atalhos.reiniciar) == Some(tecla),
         }
     }
 
-    /// As origens de um atalho que aceita tecla ou botão. O screenshot não é um deles.
+    /// As origens de um atalho que aceita tecla ou botão. O screenshot e o reiniciar não são.
     fn origens(self, atalhos: &mut Atalhos) -> Option<&mut Vec<Source>> {
         match self {
-            Self::Screenshot => None,
+            Self::Screenshot | Self::Reiniciar => None,
             Self::Avancar => Some(&mut atalhos.avancar),
             Self::Voltar => Some(&mut atalhos.voltar),
         }
     }
 }
 
-const ATALHOS: [Atalho; 3] = [Atalho::Screenshot, Atalho::Avancar, Atalho::Voltar];
+const ATALHOS: [Atalho; 4] = [Atalho::Screenshot, Atalho::Avancar, Atalho::Voltar, Atalho::Reiniciar];
 
 /// O atalho que reserva a origem: o fast-forward ou o rewind.
 fn atalho_da_origem(atalhos: &Atalhos, origem: &Source) -> Atalho {
@@ -1379,6 +1384,12 @@ impl qobject::Configuracoes {
             let atalhos = &nucleo.settings.atalhos;
             let origens = match qual {
                 Atalho::Screenshot => return QString::from(&atalhos.screenshot),
+                Atalho::Reiniciar => {
+                    return QString::from(match atalhos.reiniciar.is_empty() {
+                        true => nucleo.catalogo.get("controls.unbound"),
+                        false => atalhos.reiniciar.as_str(),
+                    });
+                }
                 Atalho::Avancar => &atalhos.avancar,
                 Atalho::Voltar => &atalhos.voltar,
             };
@@ -1416,6 +1427,7 @@ impl qobject::Configuracoes {
             Atalho::Screenshot => Source::key(Atalhos::SCREENSHOT_PADRAO),
             Atalho::Avancar => Source::key(Atalhos::AVANCAR_PADRAO),
             Atalho::Voltar => Source::key(Atalhos::VOLTAR_PADRAO),
+            Atalho::Reiniciar => Source::key(Atalhos::REINICIAR_PADRAO),
         };
         self.as_mut().define_atalho(qual, padrao);
     }
@@ -1502,17 +1514,23 @@ impl qobject::Configuracoes {
                 let botao = catalogo.get(&format!("button.{botao}")).to_string();
                 let porta = (porta + 1).to_string();
                 let chave = match qual {
-                    Atalho::Screenshot => "controls.shortcut.taken",
+                    Atalho::Screenshot | Atalho::Reiniciar => "controls.shortcut.taken",
                     Atalho::Avancar | Atalho::Voltar => "controls.shortcut.shared",
                 };
                 catalogo.format(chave, &[("key", &nome), ("button", &botao), ("port", &porta)])
             });
-            if qual == Atalho::Screenshot && conflito.is_some() {
+            if matches!(qual, Atalho::Screenshot | Atalho::Reiniciar) && conflito.is_some() {
                 return conflito;
             }
-            match qual.origens(&mut nucleo.settings.atalhos) {
-                Some(origens) => *origens = vec![origem.clone()],
-                None => nucleo.settings.atalhos.screenshot = nome.clone(),
+            let atalhos = &mut nucleo.settings.atalhos;
+            match qual {
+                Atalho::Screenshot => atalhos.screenshot = nome.clone(),
+                Atalho::Reiniciar => atalhos.reiniciar = nome.clone(),
+                Atalho::Avancar | Atalho::Voltar => {
+                    if let Some(origens) = qual.origens(atalhos) {
+                        *origens = vec![origem.clone()];
+                    }
+                }
             }
             nucleo.salva_configuracoes();
             conflito
