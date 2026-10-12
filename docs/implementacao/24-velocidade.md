@@ -74,6 +74,21 @@ manda. O contador do fixo e da meia apresentação é o mesmo nos dois (`Contado
 quadros por segundo para mostrar 60 é o que impediria o host de chegar à proporção. Um frameskip
 fixo escolhido continua valendo.
 
+### O jogo que fica para trás
+
+Um relato da 0.4.2: no Qt, numa máquina com EndeavourOS, o NFS parava (imagem e som, com a janela
+respondendo) com qualquer frameskip fora do automático, e voltava ao automático. Não se
+reproduziu: aqui o NFS anda a 1x na corrida com todas as escolhas, trocadas no meio. A suspeita é o
+jogo rodar abaixo do tempo real naquela máquina, porque o automático é a única escolha que pula
+quadro quando o jogo atrasa.
+
+Para o próximo relato trazer o dado, a sessão vigia a velocidade (`VigiaDaVelocidade`). Quando,
+num segundo real, o jogo anda menos da metade do que o ritmo pede, o registro diz o quanto andou,
+o frameskip, a meia apresentação, o custo do último quadro desenhado e do último pulado, e quantas
+voltas houve e quantas estavam adiantadas. Uma linha por episódio, e outra quando ele volta a 90%.
+Uma pausa ou o rewind não contam: a medida recomeça depois de um buraco entre as voltas. Lento de
+verdade aparece como uma velocidade baixa com quadros caros; parado aparece como zero.
+
 ## O fast-forward
 
 A velocidade é uma proporção fixa de 2x a 10x, ou "sem limite". O atalho é F10 (o do PR #83, para
@@ -184,6 +199,35 @@ gravação faria o jogo continuar escrevendo de um deslocamento antigo por cima 
 mudou: o save do jogador. Um ponto que o motor recusa (um arquivo que o jogo apagou depois, por
 exemplo) sai do anel, e o anterior é tentado. **O que o jogo gravou no disco não volta**: voltar
 para antes de um save não desfaz o save, o mesmo que o save state manual faz.
+
+### O rewind no Qt
+
+O rewind não funcionava na janela Qt. Lá ele é o único caminho que restaura um estado, porque a
+janela não tem save state manual, e a leitura do atalho rodava fora do contexto de GL do jogo.
+Voltar um ponto refaz as texturas na placa: elas eram apagadas e criadas no contexto que estivesse
+corrente, o do Qt Quick ou nenhum. A leitura agora vai com o contexto do jogo corrente, e a
+`Partida`, como antes de andar, avisa o espelho do estado da placa
+(`Session::retoma_o_contexto`) antes de voltar um ponto. O Android faz o mesmo aviso. Com o
+rasterizador de processador o aviso não faz nada, e por isso nenhum teste sem placa o observa.
+
+### A tela preta e o passo para a frente
+
+Pela placa, o Magical Drop III e o Um Jogo de Ovos ficavam com a tela preta durante todo o rewind.
+Duas coisas se somavam. O último quadro fica na textura da placa até alguém pedi-lo, e a textura não
+entra no estado: o ponto voltava com a tela de um quadro antigo, ou preta num jogo que só desenha
+pelo GL. E, restaurado o estado, o contador de escritas da tela voltava igual ao gravado, a tela
+parecia intacta, e a janela mostrava a textura da placa, que volta vazia.
+
+O ponto agora traz o quadro da placa para a tela antes de gravar (`materializa_quadro_gl`, com o
+contexto do jogo corrente, logo depois de ele andar), e a máquina restaurada diz que a imagem é a
+da tela até a próxima troca de buffer (`Machine::quadro_na_placa`). Medido com a `Partida` pela
+placa, no Magical Drop III: sem a primeira metade, a tela de cada ponto saía com 0 pixels acesos;
+com ela, com cerca de 237 mil.
+
+A mesma medida mostrou o rewind indo **para a frente**: 30.023 ms, volta a 29.000, e o passo
+seguinte de volta a 30.023. O ponto que a thread comprimia quando o jogo voltou entrava no anel
+depois e virava o mais novo. Tirar um ponto agora muda a geração do anel, como limpar, e o que
+estava em voo é descartado: 30.023, 29.000, 27.977, 26.954.
 
 ### O som que não voltava
 
