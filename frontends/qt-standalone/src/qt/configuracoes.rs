@@ -272,6 +272,12 @@ pub mod qobject {
         #[qinvokable]
         fn recusa(self: &Configuracoes, atalho: bool) -> QString;
 
+        /// O que dizer quando uma captura espera e nenhum controle manda nada: vazio enquanto não
+        /// for o caso. Ver [`Configuracoes::dica_de_captura`].
+        #[qinvokable]
+        #[cxx_name = "dicaDeCaptura"]
+        fn dica_de_captura(self: &Configuracoes) -> QString;
+
         #[qinvokable]
         #[cxx_name = "limpaBotao"]
         fn limpa_botao(self: Pin<&mut Configuracoes>, botao: &QString);
@@ -470,6 +476,8 @@ pub struct ConfiguracoesRust {
     capturando_atalho: Option<Atalho>,
     /// A última tecla recusada: se era a captura do atalho, e o motivo já traduzido.
     recusa: Option<(bool, String)>,
+    /// Quando a captura aberta começou. Ver [`qobject::Configuracoes::dica_de_captura`].
+    captura_desde: Option<std::time::Instant>,
     /// As teclas apertadas na janela de configurações, para acender o desenho.
     teclas: HashSet<Key>,
     /// A calibração em andamento: a porta e as leituras paradas juntadas até agora.
@@ -494,6 +502,9 @@ enum Liberacao {
     Feita,
     Falhou(String),
 }
+
+/// Quanto uma captura espera, sem sinal de controle nenhum, antes de a janela sugerir o que tentar.
+const ESPERA_DA_DICA: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Um atalho trocável da janela do jogo, pelo nome que o QML usa.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1298,6 +1309,7 @@ impl qobject::Configuracoes {
             true => None,
             false => Some(botao),
         };
+        rust.captura_desde = rust.capturando.is_some().then(std::time::Instant::now);
     }
 
     pub fn limpa_botao(mut self: Pin<&mut Self>, botao: &QString) {
@@ -1387,6 +1399,7 @@ impl qobject::Configuracoes {
         };
         rust.capturando = None;
         rust.recusa = None;
+        rust.captura_desde = rust.capturando_atalho.is_some().then(std::time::Instant::now);
     }
 
     pub fn capturando_atalho(&self, qual: &QString) -> bool {
@@ -1421,6 +1434,30 @@ impl qobject::Configuracoes {
             self.as_mut().rust_mut().capturando_atalho = None;
             self.as_mut().define_atalho(qual, botao);
         }
+    }
+
+    /// A dica de uma captura que espera há mais de [`ESPERA_DA_DICA`] sem que nenhum controle
+    /// tenha mandado nada desde que ela começou.
+    ///
+    /// **É o caso do controle de PS4 no Mac (issue #59)**: a captura esperava para sempre, sem
+    /// dizer nada, e quem segurava o controle não tinha por onde começar. Uma tecla fecha a
+    /// captura na hora, então a espera longa é sempre de quem tenta um controle.
+    pub fn dica_de_captura(&self) -> QString {
+        let rust = self.rust();
+        let aberta = rust.capturando.is_some()
+            || matches!(rust.capturando_atalho, Some(Atalho::Avancar | Atalho::Voltar));
+        let Some(desde) = rust.captura_desde.filter(|_| aberta) else {
+            return QString::default();
+        };
+        if desde.elapsed() < ESPERA_DA_DICA {
+            return QString::default();
+        }
+        nucleo::com(|nucleo| {
+            match nucleo.entrada.gamepads.ultimo_evento().is_some_and(|quando| quando >= desde) {
+                true => QString::default(),
+                false => QString::from(nucleo.catalogo.get("controls.no_signal")),
+            }
+        })
     }
 
     pub fn recusa(&self, atalho: bool) -> QString {
