@@ -333,6 +333,7 @@ impl Emulador {
         let mut fechar = false;
         let mut continuar = false;
         let mut alterna_pausa = false;
+        let mut reiniciar = false;
         let mut salvar_slot = None;
         let mut carregar_slot = None;
         let mut armar_sobrescrita = None;
@@ -385,6 +386,7 @@ impl Emulador {
             false => self.tr("play.pause").to_string(),
         };
         let parar_rotulo = self.tr("play.stop").to_string();
+        let reiniciar_rotulo = self.tr("play.restart").to_string();
         let mensagem = self.estado_mensagem.clone();
 
         egui::Window::new(titulo)
@@ -490,9 +492,12 @@ impl Emulador {
                     let seguir =
                         ui.add_sized([150.0, 48.0], egui::Button::new(&continuar_rotulo));
                     let pausa = ui.add_sized([110.0, 48.0], egui::Button::new(&pausa_rotulo));
+                    let recomeca =
+                        ui.add_sized([110.0, 48.0], egui::Button::new(&reiniciar_rotulo));
                     let parar = ui.add_sized([110.0, 48.0], egui::Button::new(&parar_rotulo));
                     continuar = seguir.clicked();
                     alterna_pausa = pausa.clicked();
+                    reiniciar = recomeca.clicked();
                     fechar = parar.clicked();
                     // **O mesmo primeiro foco das outras telas.** Sem ele esta janela não
                     // respondia a controle nenhum: o egui move o foco na direção da seta, mas só
@@ -583,6 +588,9 @@ impl Emulador {
             self.pausado = !pausado;
             self.confirmando = false;
             self.estado_sobrescrever = None;
+        }
+        if reiniciar {
+            self.reinicia();
         }
         if fechar {
             self.fecha();
