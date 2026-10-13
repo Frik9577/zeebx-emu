@@ -593,8 +593,21 @@ impl Nucleo {
     /// devolve apenas se nada foi desenhado em 2D depois do último `eglSwapBuffers`. Com HUD pelo
     /// `IDisplay`, caixa de mensagem ou a Z-Wheel, que compõe o 3D na CPU, vale a tela de 640×480.
     ///
+    /// **A tela de 640×480 recebe antes o quadro que a placa deixou pendente**, como no egui. Pela
+    /// placa, o `eglSwapBuffers` não lê o quadro de volta: a tela da CPU só o recebe quando alguém
+    /// pede ([`Session::materializa_quadro_gl`]). Na resolução interna 1x a textura grande não
+    /// existe e a janela mostra sempre a tela, e lida sem isto ela tinha o quadro de quando o
+    /// jogo desenhou em 2D pela última vez: o Ultimate Chess 3D piscava entre a cena e o preto.
+    ///
     /// [`Session::quadro_na_placa`]: zeebx::session::Session::quadro_na_placa
-    pub fn quadro(&self) -> Option<Quadro<'_>> {
+    /// [`Session::materializa_quadro_gl`]: zeebx::session::Session::materializa_quadro_gl
+    pub fn quadro(&mut self) -> Option<Quadro<'_>> {
+        let com_placa = self.gl.is_some();
+        let partida = self.partida.as_mut()?;
+        if partida.sessao().quadro_na_placa().filter(|_| com_placa).is_none() {
+            // É GL: lê o quadro da placa, com o contexto do jogo corrente.
+            no_contexto(com_placa, || partida.sessao_mut().materializa_quadro_gl());
+        }
         let sessao = self.partida.as_ref()?.sessao();
         let placa = self.gl.as_ref().and(sessao.quadro_na_placa());
         Some(match placa {
