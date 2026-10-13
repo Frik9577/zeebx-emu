@@ -239,7 +239,11 @@ impl qobject::TelaDoJogo {
         let (volta, mostra, destino, suave, depuracao) = nucleo::com(|nucleo| {
             let volta = nucleo.passo(area);
             let depuracao = nucleo.depuracao();
-            let graficos = &nucleo.valendo().graphics;
+            // Copiados antes: o `quadro` empresta o núcleo inteiro para trazer o quadro da placa.
+            let (scaling, keep_aspect, smooth) = {
+                let graficos = &nucleo.valendo().graphics;
+                (graficos.scaling, graficos.keep_aspect, graficos.smooth)
+            };
             // O quadro largo experimental tem a proporção dele; o resto é o 4:3 do console.
             let (mostra, aspecto) = match nucleo.quadro() {
                 Some(Quadro::Placa(quadro)) => (
@@ -266,8 +270,8 @@ impl qobject::TelaDoJogo {
                 }
                 None => (Mostra::Nada, 4.0 / 3.0),
             };
-            let enquadrado = enquadra(area, graficos.scaling, graficos.keep_aspect, aspecto);
-            (volta, mostra, centrado(area, enquadrado), graficos.smooth, depuracao)
+            let enquadrado = enquadra(area, scaling, keep_aspect, aspecto);
+            (volta, mostra, centrado(area, enquadrado), smooth, depuracao)
         });
         match mostra {
             Mostra::Textura { textura, recorte } => {
