@@ -55,10 +55,19 @@ mod time;
 mod widget;
 mod zip;
 
-/// Teto para leitura de string do guest, contra ponteiro corrompido.
 /// Teto de uma instrução SQL vinda do guest. As maiores do Z-Wheel têm 110 bytes.
 const MAX_SQL: usize = 4096;
-const MAX_STRING: usize = 4096;
+
+/// Teto para leitura de string do guest, contra ponteiro corrompido.
+///
+/// **Um MiB, e não quatro KB.** O teto só protege de um ponteiro sem terminador: a leitura vai em
+/// blocos até o zero, e uma string curta custa o mesmo com qualquer teto. Mas o jogo não tem teto
+/// nenhum, e com quatro KB o `strlen` mentia. As fases do Alice no País das Maravilhas são código
+/// Lua com o mapa de blocos numa string base64 de uma linha só — 15.426 caracteres na fase 2, e
+/// 202.806 no `stage1-30` —, e o jogo decodificava só os primeiros 4.096. Os blocos vêm em ordem de
+/// linha: tudo abaixo da linha 29 da fase 2 sumia, desenho e colisão. Era a faixa preta no pé da
+/// tela, e a sala da brecha sem chão, onde a Alice caía para sempre.
+const MAX_STRING: usize = 1 << 20;
 
 /// Teto para as conversões de número (`strtoul`, `atoi`, `strtod`).
 ///
