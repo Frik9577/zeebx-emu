@@ -2017,12 +2017,15 @@ fn codigo_funcao(funcao: u32) -> i32 {
     }
 }
 
-/// A fonte do `GL_COMBINE` no shader: textura, constante, cor primária ou unidade anterior.
+/// A fonte do `GL_COMBINE` no shader: textura, constante, cor primária, unidade anterior ou, pelo
+/// crossbar, o texel da unidade 0 ou da 1. Ver `fonte_do_combine`, no rasterizador.
 fn codigo_fonte(fonte: u32) -> i32 {
     match fonte {
         gles::GL_TEXTURE => 0,
         gles::GL_CONSTANT => 1,
         gles::GL_PRIMARY_COLOR => 2,
+        f if f == gles::GL_TEXTURE0 => 4,
+        f if f == gles::GL_TEXTURE0 + 1 => 5,
         _ => 3,
     }
 }
@@ -2148,12 +2151,26 @@ uniform int func_alfa;
 uniform float ref_alfa;
 out vec4 saida;
 
-// A fonte do `GL_COMBINE`: 0 a textura, 1 a constante, 2 a cor primária, 3 a unidade anterior.
-vec4 fonte_de(int qual, vec4 anterior, vec4 primaria, vec4 texel, vec4 constante) {
+// A fonte do `GL_COMBINE`: 0 a textura, 1 a constante, 2 a cor primária, 3 a unidade anterior,
+// 4 e 5 o texel da unidade 0 e o da 1 (o crossbar).
+vec4 fonte_de(int qual, vec4 anterior, vec4 primaria, vec4 texel, vec4 constante, vec4 texel0,
+              vec4 texel1) {
     if (qual == 0) { return texel; }
     if (qual == 1) { return constante; }
     if (qual == 2) { return primaria; }
+    if (qual == 4) { return texel0; }
+    if (qual == 5) { return texel1; }
     return anterior;
+}
+
+// Se alguma fonte é o texel de uma unidade que não desenha: aí a unidade age como desligada, a
+// regra do `ARB_texture_env_crossbar`. Igual ao `TexEnv::combina` do software.
+bool falta_unidade(int srgb[3], int salfa[3]) {
+    for (int i = 0; i < 3; i++) {
+        if ((srgb[i] == 4 || salfa[i] == 4) && texturando != 1) { return true; }
+        if ((srgb[i] == 5 || salfa[i] == 5) && texturando1 != 1) { return true; }
+    }
+    return false;
 }
 
 // O operando no RGB: a cor, o complemento dela, o alfa ou o complemento dele.
@@ -2192,13 +2209,17 @@ float funcao_alfa(int f, float a0, float a1, float a2) {
 // Uma unidade de textura, caso a caso igual ao `TexEnv::aplica_com` do software: os modos
 // clássicos agem sobre o que saiu da unidade anterior.
 vec4 unidade(int modo, int crgb, int calfa, int srgb[3], int orgb[3], int salfa[3], int oalfa[3],
-             float ergb, float ealfa, vec4 constante, vec4 anterior, vec4 primaria, vec4 texel) {
+             float ergb, float ealfa, vec4 constante, vec4 anterior, vec4 primaria, vec4 texel,
+             vec4 texel0, vec4 texel1) {
     if (modo == 4) {
+        if (falta_unidade(srgb, salfa)) { return anterior; }
         vec3 r[3];
         float a[3];
         for (int i = 0; i < 3; i++) {
-            r[i] = operando_rgb(orgb[i], fonte_de(srgb[i], anterior, primaria, texel, constante));
-            a[i] = operando_alfa(oalfa[i], fonte_de(salfa[i], anterior, primaria, texel, constante));
+            r[i] = operando_rgb(orgb[i],
+                                fonte_de(srgb[i], anterior, primaria, texel, constante, texel0, texel1));
+            a[i] = operando_alfa(oalfa[i],
+                                 fonte_de(salfa[i], anterior, primaria, texel, constante, texel0, texel1));
         }
         vec3 rgb = clamp(funcao_rgb(crgb, r[0], r[1], r[2]) * ergb, 0.0, 1.0);
         float alfa = clamp(funcao_alfa(calfa, a[0], a[1], a[2]) * ealfa, 0.0, 1.0);
@@ -2218,13 +2239,17 @@ vec4 unidade(int modo, int crgb, int calfa, int srgb[3], int orgb[3], int salfa[
 void main() {
     vec4 primaria = vcor;
     vec4 cor = primaria;
+    // As duas unidades amostram antes de qualquer uma combinar: pelo crossbar, a 0 pode ler o
+    // texel da 1.
+    vec4 texel0 = texturando == 1 ? texture(amostra, vuv) : vec4(0.0);
+    vec4 texel1 = texturando1 == 1 ? texture(amostra1, vuv1) : vec4(0.0);
     if (texturando == 1) {
         cor = unidade(env, cmb_rgb, cmb_alfa, src_rgb, op_rgb, src_alfa, op_alfa, escala_rgb,
-                      escala_alfa, cor_env, cor, primaria, texture(amostra, vuv));
+                      escala_alfa, cor_env, cor, primaria, texel0, texel0, texel1);
     }
     if (texturando1 == 1) {
         cor = unidade(env1, cmb_rgb1, cmb_alfa1, src_rgb1, op_rgb1, src_alfa1, op_alfa1,
-                      escala_rgb1, escala_alfa1, cor_env1, cor, primaria, texture(amostra1, vuv1));
+                      escala_rgb1, escala_alfa1, cor_env1, cor, primaria, texel1, texel0, texel1);
     }
     // A névoa entra depois da textura e antes do teste de alfa, e mexe só no RGB — a mesma
     // ordem do rasterizador de software.
@@ -3628,6 +3653,72 @@ mod tests {
             pixel(&a, largura, 1, 1),
             pixel(&b, largura, 1, 1),
             "sem névoa os dois têm de voltar a concordar"
+        );
+    }
+
+    /// A água do Bóia Cross, com as chamadas que o jogo faz: `DOT3` entre o mapa de normais e o
+    /// vetor da luz na cor do vértice, e a unidade 1 multiplicando pela cor da água que ela lê
+    /// por `GL_TEXTURE1`. As duas funções inválidas no meio são do jogo e têm de ser ignoradas.
+    ///
+    /// Antes, os dois rasterizadores davam azul: o mapa de normais vezes o vértice, ao quadrado.
+    #[test]
+    fn a_agua_do_boia_cross_sai_igual_nos_dois_rasterizadores() {
+        let (largura, altura) = (16, 16);
+        let Some((mut gpu, mut sw)) = par(largura, altura) else {
+            return;
+        };
+        let cena = |r: &mut dyn Rasterizador| {
+            r.set_viewport(0, 0, largura as i32, altura as i32);
+            r.set_clear_color([0.0, 0.0, 0.0, 1.0]);
+            r.clear(gles::GL_COLOR_BUFFER_BIT);
+            let unidade1 = gles::GL_TEXTURE0 + 1;
+            r.set_active_texture(gles::GL_TEXTURE0);
+            r.bind_texture(1);
+            r.upload_level(1, 0, 1, 1, vec![[128, 128, 255, 255]]);
+            r.set_capability(gles::GL_TEXTURE_2D, true);
+            r.set_texture_env(gles::GL_COMBINE);
+            r.set_texture_env_param(gles::GL_COMBINE_RGB, gles::GL_DOT3_RGB, 0.0);
+            r.set_texture_env_param(gles::GL_COMBINE_RGB, gles::GL_TEXTURE0, 0.0);
+            r.set_texture_env_param(gles::GL_SRC0_RGB + 1, gles::GL_PRIMARY_COLOR, 0.0);
+            r.set_active_texture(unidade1);
+            r.bind_texture(2);
+            r.upload_level(2, 0, 1, 1, vec![[160, 120, 80, 255]]);
+            r.set_capability(gles::GL_TEXTURE_2D, true);
+            r.set_texture_env(gles::GL_COMBINE);
+            r.set_texture_env_param(gles::GL_COMBINE_RGB, gles::GL_COMBINE, 0.0);
+            r.set_texture_env_param(gles::GL_SRC0_RGB, gles::GL_PREVIOUS, 0.0);
+            r.set_texture_env_param(gles::GL_SRC0_RGB + 1, unidade1, 0.0);
+            r.set_texture_env_param(gles::GL_COMBINE_ALPHA, gles::GL_REPLACE, 0.0);
+            r.set_texture_env_param(gles::GL_SRC0_ALPHA, unidade1, 0.0);
+            r.set_texture_env_param(gles::GL_SRC0_ALPHA + 1, gles::GL_TEXTURE0, 0.0);
+            // A luz (0, 0, ½) codificada como cor: o `DOT3` com a normal (0, 0, ½) dá ½.
+            let canto = |x: f32, y: f32| Vertex {
+                position: [x, y, 0.0, 1.0],
+                color: [0.5, 0.5, 0.75, 0.0],
+                uv: UV_PADRAO,
+                uv1: UV_PADRAO,
+                normal: [0.0, 0.0, 1.0],
+                fog: 1.0,
+            };
+            r.draw(
+                gles::GL_TRIANGLES,
+                &[canto(-1.0, 1.0), canto(-1.0, -1.0), canto(1.0, 1.0)],
+            );
+        };
+        let (a, b) = ambos(&mut gpu, &mut sw, largura, altura, cena);
+        let (placa, software) = (pixel(&a, largura, 1, 1), pixel(&b, largura, 1, 1));
+        // Metade do marrom (80, 60, 40) em RGB565: perto de (9,7; 14,8; 4,9).
+        assert!(
+            (9..=10).contains(&software.0)
+                && (14..=15).contains(&software.1)
+                && (4..=5).contains(&software.2),
+            "o software devia dar metade do marrom, e deu {software:?}"
+        );
+        assert!(
+            placa.0.abs_diff(software.0) <= 1
+                && placa.1.abs_diff(software.1) <= 1
+                && placa.2.abs_diff(software.2) <= 1,
+            "placa {placa:?} contra software {software:?}"
         );
     }
 
