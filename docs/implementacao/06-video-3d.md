@@ -188,7 +188,8 @@ funções de buffer pelo `eglGetProcAddress`. Três defeitos nossos apareceram c
 
 E o `glTexEnv` ganhou o **`GL_COMBINE`** (`TexEnv`, nos dois rasterizadores): função, três fontes e
 operandos para o RGB e para o alfa, escalas e a `GL_TEXTURE_ENV_COLOR`, na unidade 0. Antes ele
-caía no `GL_MODULATE`. O QX configura a combinação com a fonte na textura.
+caía no `GL_MODULATE`. O QX configura a combinação com a fonte na textura. Função e fonte
+inválidas são recusadas, e as fontes aceitam o crossbar — ver a seção do Bóia Cross.
 
 **Os personagens sumiam porque respondíamos uma unidade de textura só.** O motor pergunta
 `GL_MAX_TEXTURE_UNITS` na abertura e guarda a resposta no gerenciador de extensões; o gerenciador
@@ -202,6 +203,39 @@ Com duas unidades, o motor ilumina pela textura: `DOT3_RGB` entre o mapa de rele
 a cor do vértice, que passa a levar a direção da luz, na unidade 0; e `ADD_SIGNED` com a textura
 de cor, alfa pela `GL_TEXTURE_ENV_COLOR`, na unidade 1. O dragão, as galinhas e o cenário inteiro
 — cachoeira, rochas, a iluminação — aparecem, nos dois rasterizadores.
+
+## A água do Bóia Cross: enum inválido e o crossbar
+
+A água da primeira pista (Santo André) saía azul-roxa e opaca; no longplay capturado do console
+ela é marrom e turva. O rastreio do desenho dela (`sessao --trace=IGLES11`, código do jogo em
+`0x3cf64`) mostra o QX montando um relevo em duas unidades:
+
+```
+unidade 0  textura 0xca (mapa de normais, o azul-lilás)
+           GL_COMBINE_RGB = GL_DOT3_RGB
+           GL_COMBINE_RGB = GL_TEXTURE0        <- queria GL_SRC0_RGB
+           GL_SRC1_RGB    = GL_PRIMARY_COLOR   (o vetor da luz, ~(0,5; 0,95; 0,7))
+unidade 1  textura 0xc9 (a cor da água, marrom)
+           GL_COMBINE_RGB = GL_COMBINE         <- não é função nenhuma
+           GL_SRC0_RGB    = GL_PREVIOUS
+           GL_SRC1_RGB    = GL_TEXTURE1
+           GL_COMBINE_ALPHA = GL_REPLACE, GL_SRC0_ALPHA = GL_TEXTURE1
+```
+
+Dois defeitos nossos se somavam:
+
+- **Aceitávamos qualquer valor.** No driver, função ou fonte que não existe é
+  `GL_INVALID_ENUM` e o valor de antes fica: a unidade 0 continua no `DOT3`, a 1 no `MODULATE`
+  padrão. Aqui o `GL_TEXTURE0` virava a função e caía na multiplicação — o mapa de normais vezes o
+  vetor da luz, que é a cor azul-roxa da água. O `TexEnv::define` agora recusa os dois.
+- **`GL_TEXTURE0` e `GL_TEXTURE1` como fonte** (o `ARB_texture_env_crossbar`) caíam no
+  `GL_PREVIOUS`. A unidade 1 multiplicava o anterior por ele mesmo, e a textura marrom nunca era
+  amostrada. O crossbar não é do OpenGL ES 1.1, mas o aparelho o aceita: com a fonte recusada a
+  unidade 1 ficaria no `GL_PREVIOUS` padrão, sem marrom nenhum, e a água do vídeo é marrom.
+
+Nos dois rasterizadores as duas unidades agora amostram antes de qualquer uma combinar, e uma
+fonte que aponta para unidade que não desenha faz a unidade passar o anterior adiante, que é a
+regra do crossbar. Essa última não foi medida no aparelho — nenhum jogo testado a exercita.
 
 ## A distância de desenho dos Zeebo Extreme
 
