@@ -745,12 +745,12 @@ impl Nucleo {
 
     pub fn alterna_pausa(&mut self) {
         if let Some(partida) = self.partida.as_mut() {
-            partida.pausada = !partida.pausada;
+            partida.alterna_pausa();
         }
     }
 
     pub fn pausada(&self) -> bool {
-        self.partida.as_ref().is_some_and(|partida| partida.pausada)
+        self.partida.as_ref().is_some_and(Partida::pausada)
     }
 
     /// Uma tecla da janela do jogo. Cada evento vai à partida na hora: ver
