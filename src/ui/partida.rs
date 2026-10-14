@@ -213,7 +213,8 @@ pub struct Partida {
     teclas_pendentes: Vec<(u32, bool)>,
     /// Quando o jogo rodou pela última vez, para saber quanto tempo real ele tem a recuperar.
     ultimo_passo: Instant,
-    pub pausada: bool,
+    /// Parada pela janela. Muda só pela [`Partida::alterna_pausa`], que leva o som junto.
+    pausada: bool,
     /// Se o jogo foi aberto pela Z-Wheel. Quando ele sai sozinho, a Z-Wheel volta, como no
     /// console; aberto pela biblioteca, sair encerra.
     pub aberta_pela_z_wheel: bool,
@@ -477,13 +478,28 @@ impl Partida {
         self.pad_anterior = Default::default();
         self.teclas_entregues.clear();
         self.teclas_pendentes.clear();
-        self.pausada = false;
+        self.define_pausa(false);
         self.avanco.desliga();
         self.avancando = false;
         for turbo in &mut self.turbos {
             turbo.desliga();
         }
         self.rewind.solta();
+    }
+
+    pub fn pausada(&self) -> bool {
+        self.pausada
+    }
+
+    pub fn alterna_pausa(&mut self) {
+        self.define_pausa(!self.pausada);
+    }
+
+    /// Pausa ou solta o jogo, e o som com ele: sem isso a música seguia tocando com a imagem
+    /// parada. Ver [`Session::congela_o_som`].
+    fn define_pausa(&mut self, pausada: bool) {
+        self.pausada = pausada;
+        self.sessao.congela_o_som(pausada);
     }
 
     /// Lê o atalho do rewind desta volta. Vem **antes** do [`Partida::le_o_avanco`] e do
