@@ -296,6 +296,28 @@ struct State {
     /// Calado pelo fast-forward, à parte do `muted` do usuário: soltar o avanço não pode ligar um
     /// som que o usuário desligou.
     abafado: bool,
+    /// Parado pela pausa da janela. Ver [`Mixer::congela`].
+    congelado: bool,
+    /// Quanto do som sai, em quadros de [`DESCIDA_FRAMES`]: cheio fora da pausa, zero dentro dela,
+    /// e no meio enquanto entra ou sai.
+    audivel: u32,
+}
+
+impl State {
+    /// Passa `out` pela rampa da pausa, um quadro por vez.
+    fn rampa_da_pausa(&mut self, out: &mut [f32], channels: usize) {
+        if !self.congelado && self.audivel == DESCIDA_FRAMES {
+            return;
+        }
+        for frame in out.chunks_mut(channels) {
+            self.audivel = match self.congelado {
+                true => self.audivel.saturating_sub(1),
+                false => (self.audivel + 1).min(DESCIDA_FRAMES),
+            };
+            let ganho = self.audivel as f32 / DESCIDA_FRAMES as f32;
+            frame.iter_mut().for_each(|sample| *sample *= ganho);
+        }
+    }
 }
 
 /// O mixer, compartilhado entre o emulador e a linha de execução de áudio.
@@ -317,6 +339,7 @@ impl Mixer {
                 master,
                 muted,
                 ritmo: 1.0,
+                audivel: DESCIDA_FRAMES,
                 ..State::default()
             })),
         }
@@ -517,6 +540,24 @@ impl Mixer {
         }
     }
 
+    /// Para todo o som onde está, ou o solta: é a pausa da janela.
+    ///
+    /// **Pausar não é calar.** O mudo deixa o som correr, e o `set_paused` de uma voz é o jogo
+    /// pedindo; aqui é o jogo inteiro que para. O fim de cada som o jogo mede pelo relógio
+    /// virtual, que a pausa segura: com o mixer andando, a música seguia tocando com a imagem
+    /// parada, chegava ao fim durante a pausa, e na volta o jogo esperava um som que já tinha
+    /// acabado. Os fluxos já se calavam sozinhos, porque o jogo parado não os alimenta — por isso
+    /// o defeito só aparecia em alguns jogos.
+    ///
+    /// Entrar e sair passam por [`DESCIDA_FRAMES`] quadros de rampa, pelo motivo da descida de uma
+    /// voz: parar no meio da onda estala. Na entrada, o som anda esses quadros a mais; menos de
+    /// 2 ms, abaixo de qualquer diferença que o jogo meça.
+    pub fn congela(&self, congelado: bool) {
+        if let Ok(mut state) = self.state.lock() {
+            state.congelado = congelado;
+        }
+    }
+
     /// Um mixer sem placa nenhuma, para gravar em arquivo o que sairia pelo alto-falante.
     ///
     /// Existe para poder **conferir** o som: sem isto, a única forma de saber se o áudio está
@@ -545,11 +586,16 @@ impl Mixer {
             false => state.master,
         };
         let ritmo = state.ritmo;
+        // Congelado, só andam os quadros que faltam da rampa; o resto fica onde está.
+        let vivos = match state.congelado {
+            true => frames.min(state.audivel as usize),
+            false => frames,
+        };
         if master == 0.0 {
             // Mudo ainda consome as vozes: o som continua correndo, só não sai.
             for voice in state.voices.values_mut() {
                 if !voice.paused && !voice.done {
-                    for _ in 0..frames {
+                    for _ in 0..vivos {
                         voice.passo(ritmo);
                     }
                 }
@@ -557,18 +603,19 @@ impl Mixer {
             state.voices.retain(|_, voice| !voice.done);
             for stream in state.streams.values_mut() {
                 if !stream.paused {
-                    for _ in 0..frames {
+                    for _ in 0..vivos {
                         stream.next_frame(ritmo);
                     }
                 }
             }
+            state.rampa_da_pausa(out, channels);
             return;
         }
         for voice in state.voices.values_mut() {
             if voice.paused || voice.done {
                 continue;
             }
-            for frame in out.chunks_mut(channels) {
+            for frame in out[..vivos * channels].chunks_mut(channels) {
                 if voice.done {
                     break;
                 }
@@ -588,13 +635,14 @@ impl Mixer {
                 continue;
             }
             let gain = stream.volume * master;
-            for frame in out.chunks_mut(channels) {
+            for frame in out[..vivos * channels].chunks_mut(channels) {
                 let stereo = stream.next_frame(ritmo);
                 for (channel, slot) in frame.iter_mut().enumerate() {
                     *slot += stereo[channel.min(1)] * gain;
                 }
             }
         }
+        state.rampa_da_pausa(out, channels);
         // Somar vozes estoura a faixa; cortar é o que uma placa faria de qualquer forma, e é
         // melhor que deixar o valor dar a volta e virar estalo.
         for sample in out.iter_mut() {
@@ -984,6 +1032,53 @@ mod tests {
         mixer.set_paused(1, false);
         mixer.fill(&mut out, 2);
         assert!(out[0] > 0.0);
+    }
+
+    /// A pausa da janela para a música onde ela está, sem estalo na entrada nem na saída, e na
+    /// volta a música continua do mesmo ponto. Antes ela seguia tocando com a imagem parada.
+    #[test]
+    fn congelado_o_som_desce_para_e_volta_de_onde_parou() {
+        let quadros = 1_000usize;
+        let mixer = mixer(1_000);
+        mixer.play(1, tone(1_000, quadros), 1.0, 1);
+        let _ = mixer.render(100);
+        mixer.congela(true);
+        let descida = mixer.render(DESCIDA_FRAMES as usize);
+        let esquerda: Vec<f32> = descida.iter().step_by(2).copied().collect();
+        assert!(esquerda[0] > 0.9 && esquerda.windows(2).all(|par| par[1] <= par[0]));
+        assert_eq!(esquerda.last().copied(), Some(0.0));
+        // Parado, nem sai nem anda: um minuto inteiro não chega ao fim do som de um segundo.
+        assert!(mixer.render(60_000).iter().all(|&s| s == 0.0));
+        assert!(mixer.is_playing(1), "a música acabou durante a pausa");
+
+        mixer.congela(false);
+        let subida: Vec<f32> = mixer
+            .render(DESCIDA_FRAMES as usize)
+            .into_iter()
+            .step_by(2)
+            .collect();
+        assert!(subida[0] > 0.0 && subida[0] < 0.1, "{subida:?}");
+        assert!(subida.windows(2).all(|par| par[1] >= par[0]));
+        // Na volta sai o resto do som: o total menos os 100 quadros de antes da pausa. A rampa da
+        // entrada andou DESCIDA_FRAMES quadros, e a descida do fim do som soma outros tantos.
+        let mut total = DESCIDA_FRAMES as usize;
+        while mixer.is_playing(1) && total < 10_000 {
+            let _ = mixer.render(10);
+            total += 10;
+        }
+        let esperado = quadros - 100;
+        assert!(total.abs_diff(esperado) <= 10, "{total} contra {esperado}");
+    }
+
+    /// Mudo e pausado ao mesmo tempo, o som também fica parado: o mudo deixa correr, a pausa não.
+    #[test]
+    fn congelado_e_mudo_o_som_nao_anda() {
+        let mixer = mixer(8000);
+        mixer.play(1, tone(8000, 1_000), 1.0, 1);
+        mixer.set_master(1.0, true);
+        mixer.congela(true);
+        let _ = mixer.render(10_000);
+        assert!(mixer.is_playing(1));
     }
 
     #[test]
