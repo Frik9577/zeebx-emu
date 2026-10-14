@@ -147,6 +147,8 @@ pub struct Session {
     pulo: PuloDaSessao,
     /// A velocidade que o som segue. Ver [`Session::acompanha_o_som`].
     som_do_avanco: SomDoAvanco,
+    /// O som parado pela pausa. Ver [`Session::congela_o_som`].
+    som_congelado: bool,
     /// A vigia do jogo que fica para trás. Ver [`VigiaDaVelocidade`].
     vigia: VigiaDaVelocidade,
     /// O turbo: o controle cru de cada porta e os botões que pulsam. Ver [`Session::pulsa`].
@@ -718,6 +720,7 @@ impl Session {
             proporcao: Some(1.0),
             pulo: PuloDaSessao::default(),
             som_do_avanco: SomDoAvanco::default(),
+            som_congelado: false,
             vigia: VigiaDaVelocidade::default(),
             turbo: TurboDaSessao::default(),
             stopped: None,
@@ -1412,8 +1415,10 @@ impl Session {
         }
         match crate::audio::Output::open(level, false) {
             Ok(output) => {
-                // A saída nova nasce em 1x e audível: o que foi entregue à anterior não vale.
+                // A saída nova nasce em 1x e audível: o que foi entregue à anterior não vale. A
+                // pausa, sim: trocar o volume com o jogo pausado não pode soltar a música.
                 self.som_do_avanco.enviado = None;
+                output.mixer().congela(self.som_congelado);
                 self.machine.set_audio(Some(output.mixer()));
                 self.audio = Some(output);
                 None
@@ -1635,6 +1640,21 @@ impl Session {
         #[cfg(feature = "audio")]
         if let Some(audio) = &self.audio {
             audio.mixer().define_avanco(ritmo, abafado);
+        }
+    }
+
+    /// Para o som onde ele está, ou o solta: é a pausa da janela. Ver
+    /// [`crate::audio::Mixer::congela`].
+    ///
+    /// Diferente do [`Session::cala`]: calado, o som corre sem sair; congelado, ele espera o jogo.
+    pub fn congela_o_som(&mut self, congelado: bool) {
+        if self.som_congelado == congelado {
+            return;
+        }
+        self.som_congelado = congelado;
+        #[cfg(feature = "audio")]
+        if let Some(audio) = &self.audio {
+            audio.mixer().congela(congelado);
         }
     }
 
@@ -2033,6 +2053,7 @@ pub(crate) mod tests {
             proporcao: Some(1.0),
             pulo: PuloDaSessao::default(),
             som_do_avanco: SomDoAvanco::default(),
+            som_congelado: false,
             vigia: VigiaDaVelocidade::default(),
             turbo: TurboDaSessao::default(),
             stopped: None,
