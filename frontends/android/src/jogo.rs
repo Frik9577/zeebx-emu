@@ -68,6 +68,9 @@ impl Emulador {
         // Com a pergunta na tela, em pausa ou voltando, o jogo fica parado — inclusive o relógio,
         // para ele não gastar o orçamento todo de uma vez quando voltar.
         let parado = self.confirmando || self.pausado || self.rewind.voltando();
+        // O som para junto, menos no rewind, que já o cala e troca pelo de cada ponto. Ver
+        // `Session::congela_o_som`.
+        sessao.congela_o_som(self.confirmando || self.pausado);
         if parado {
             self.avancando = false;
             self.ultimo = Instant::now();
