@@ -386,6 +386,40 @@ de GL. Um pedido que passe do fim do buffer sai **zerado** em vez de falhar, por
 deixa o resultado indefinido ali e derrubar o `glDrawElements` inteiro por causa de um vértice
 seria pior — ver `fatia_do_buffer` e os testes dela.
 
+## Os nomes de textura e de buffer: o Rally Master Pro
+
+O Rally Master Pro parava depois de algumas corridas, na troca de cena, com "acesso inválido a
+`0x0101010d`". A parada era determinística: um roteiro sem janela que abandona a etapa e a
+recarrega a cada 30 s parava sempre no mesmo ponto, aos 194 s, no quinto ou sexto ciclo. O
+endereço é `0x01010101 + 0x0c`: um campo lido de memória coberta de bytes `0x01`.
+
+O que achou o culpado foi uma guarda temporária: 64 bytes preenchidos depois de cada bloco do
+heap, e uma vigia de escrita nas guardas. Todas as escritas fora do lugar caíam no mesmo bloco,
+um vetor de 248 bytes, e eram bytes `0x01` logo depois do fim dele. Na parada provocada pela
+vigia, os registradores mostravam um `glBindTexture(GL_TEXTURE_2D, …)` a caminho, e a escrita
+anterior tinha sido no índice `0xf8`: o jogo guarda uma flag por textura, indexada pelo **nome**
+dela.
+
+Os nomes saíam de um contador que só crescia. A especificação permite: o `glGen*` só precisa
+entregar nomes fora de uso. Mas cada etapa apaga e recria as texturas da cena, então o nome
+passava de 248 em algumas corridas, e a flag ia parar no objeto vizinho do heap. Com a guarda no
+caminho, as escritas ficavam nela e o jogo não parava, o que fechou o diagnóstico.
+
+Agora os nomes em uso ficam num `NomesGl`, um para texturas e outro para buffers, e o `glGen*`
+entrega o **menor nome livre**: nome apagado volta a sair. O `glBind*` de um nome nunca gerado o
+marca como usado, porque o OpenGL cria o objeto na primeira ligação. Com isso, o mesmo roteiro
+rodou 680 s, cerca de 21 ciclos, sem parar e sem acesso inválido nenhum.
+
+**Qual nome o driver do Zeebo entrega não foi medido.** Sabe-se só que ele reaproveita, porque o
+jogo não para no console. O menor livre é o que mantém os nomes baixos, e nomes baixos são o que
+o vetor de 248 supõe. O Mesa, por exemplo, entrega o maior em uso mais um, o que também
+reaproveita quando a cena inteira sai.
+
+O save state guarda os dois conjuntos. Um estado anterior a isso só tem o contador, e então os
+nomes de 1 até ele ficam em uso, que é o que o contador garantia. O campo do contador continua
+no arquivo, com o maior nome em uso: um motor antigo que abra um estado novo continua a contar
+dali, sem repetir um nome vivo.
+
 ## Apresentação
 
 `eglSwapBuffers` é o que marca um quadro. A interface só redesenha quando o contador de trocas
