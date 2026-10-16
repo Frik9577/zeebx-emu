@@ -2148,6 +2148,22 @@ pub(crate) mod tests {
         assert!(visto.is_down(up));
     }
 
+    /// O jogo vê o HOME como `Back` e `Start` juntos, e soltá-lo solta os dois. Ver
+    /// [`Pad::com_o_home_nos_dois`].
+    #[test]
+    fn o_jogo_ve_o_home_como_back_e_start() {
+        let mut sessao = sessao_minima_para_save_state();
+        let mut home = Pad::default();
+        home.press(crate::input::HOME, true);
+        sessao.set_port_pad(0, home);
+        let visto = sessao.machine.pad_da_porta(0);
+        assert!(visto.is_down(crate::input::HOME) && visto.is_down(crate::input::START));
+
+        sessao.set_port_pad(0, Pad::default());
+        let visto = sessao.machine.pad_da_porta(0);
+        assert!(!visto.is_down(crate::input::HOME) && !visto.is_down(crate::input::START));
+    }
+
     /// O fast-forward começa na proporção pedida: a média do som e do rótulo não sobe de 1x aos
     /// poucos. Sem pedido — o sem limite —, ela espera a primeira medida.
     #[test]
