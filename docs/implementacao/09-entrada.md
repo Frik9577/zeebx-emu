@@ -24,9 +24,33 @@ testá-lo sem hardware nenhum.
 - **`Button_1` e `Button_3`.** Faltam na lista do console, que traz o `2` e o `4` mas põe um UID
   de eixo no lugar de um deles. A tela de ajuda do próprio Quake nomeia os quatro — "aperte 1
   para pular" —, então eles existem no controle.
-- **`HOME` é o `Back` do BREW.** O controle tem HOME impresso na carcaça, e o `hid_devices.cfg`
-  mapeia esse botão físico para `AEEUID_HIDJoystick_Back`. O Double Dragon pede "APERTE O BOTÃO
-  HOME" e quem responde é o `back`.
+- **`HOME` é o `Back` e o `Start` do BREW, juntos.** O controle tem HOME impresso na carcaça, e
+  o `hid_devices.cfg` mapeia esse botão físico para `AEEUID_HIDJoystick_Back`. O Double Dragon
+  pede "APERTE O BOTÃO HOME" e só responde ao `back`. Ver *O HOME chega com dois UIDs*, adiante.
+
+### O HOME chega com dois UIDs
+
+O Quake pede "Aperte o botão Home para chamar o menu", e no meio da fase o menu não abria. A
+tabela de UIDs dele, em `0x7a4` no módulo, subtrai `0x0106c3fe` do UID e salta por uma tabela:
+o `Start` (`0x0106c402`) vira o índice 9, o `Back` (`0x0106c403`) cai em "botão desconhecido".
+O índice 9 vira o `AVK_CLR`, e o Quake liga a tecla que sai dele, a 174, ao `togglemenu`
+(`Key_SetBinding` em `0x8fcc`). O Double Dragon é o contrário: na tela de título, o `back` abre o
+menu e o `start` não faz nada.
+
+Os dois rodam no mesmo aparelho, e o controle tem um botão só no meio. Então o HOME chega com os
+dois UIDs, e é o que `Pad::com_o_home_nos_dois` faz na entrada da porta. **Não foi medido no
+console.** O que sustenta a escolha é um levantamento das tabelas de UID que partem de
+`0x0106c3fe`:
+
+| Jogo | `Start` | `Back` |
+|---|---|---|
+| Quake | reconhece | não |
+| FIFA 09, Need for Speed, Quake II, Action Hero 3D | não | reconhece |
+| Alien Breaker, Tork and Kral, Heavy Weapon | guarda num bit | guarda num bit |
+
+Nos três da última linha a biblioteca guarda cada botão num bit (`0x200` o `Start`, `0x100` o
+`Back`), e não achei consulta ao bit do `Start` em nenhum deles. Nenhum jogo do levantamento dá
+ações diferentes aos dois. Só nesse sentido: um `start` mapeado à mão continua só `Start`.
 
 ### Eixos
 
@@ -393,8 +417,21 @@ configurá-lo.
 
 ## Teclas de verdade
 
-Além do controle, o emulador entrega `EVT_KEY` (`0x100`) com os códigos AVK do BREW:
-`AVK_SELECT = 0xE015`, `AVK_0..9 = 0xE030..`, `AVK_CLR = 0xE04A`, e os quatro sentidos.
+Além do controle, o emulador entrega `EVT_KEY` (`0x100`) com os códigos AVK do BREW, na
+numeração do `AEEVCodes.h` que está em `input::avk`: `AVK_0..9 = 0xE021..`, `AVK_CLR = 0xE030`,
+os quatro sentidos de `0xE031` a `0xE034` e `AVK_SELECT = 0xE035`.
+
+**A soltura é `EVT_KEY_RELEASE`, `0x102`.** Ela saía como `0x101`, que no `AEE.h` é o
+`EVT_KEY_PRESS`. O Quake só lê esses dois, e confirma a numeração: o tratador dele (`0x3a8ec`)
+trata `0x101` como aperto e `0x102` como soltura, e a tradução que ele mesmo faz do controle em
+tecla manda `0x101` no aperto (`0x49a24`). O botão 2 vira `AVK_CLR` na tradução do emulador, e a
+soltura dele chegava ao Quake como um aperto do `AVK_CLR`, ou seja, da tecla do menu. Como a
+soltura de verdade nunca vinha, a tecla ficava abaixada para sempre, e todo aperto seguinte era
+descartado como repetição: depois do primeiro botão 2, o menu não abria mais.
+
+O aperto continua só como `EVT_KEY`. Com o `EVT_KEY_PRESS` junto, o botão 2 abriria o menu do
+Quake no meio da fase, e no aparelho ele não abre: no longplay, o "Sempre correr desligado" do
+botão 2 aparece sem menu nenhum, e o menu vem depois, sozinho.
 
 **Uma tecla vai primeiro aos tratadores de widget e só depois ao applet.** É a ordem do BREW: a
 interface tem a primeira chance, e o que ela não consumir sobe. Entregar direto ao applet faz
