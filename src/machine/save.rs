@@ -1162,7 +1162,11 @@ impl<C: CpuBackend> Machine<C> {
             self.current_applet,
             self.applet_class,
             self.egl_next_handle,
-            self.gles_next_name,
+            // Era o contador de nomes do OpenGL ES. Vai o maior nome em uso: um motor antigo que
+            // abra este estado continua a contar dali, sem repetir um nome vivo.
+            self.nomes_de_textura
+                .maior()
+                .max(self.nomes_de_buffer.maior()),
             self.egl_swaps,
             self.gl_clears,
             self.unpack_alignment,
@@ -1192,6 +1196,8 @@ impl<C: CpuBackend> Machine<C> {
         numeros.push(self.ativacao_pendente.unwrap_or((0, 0)).0);
         numeros.push(self.ativacao_pendente.unwrap_or((0, 0)).1);
         secoes.poe_u32s("esc.numeros", numeros);
+        secoes.poe_u32s("esc.nomes_de_textura", self.nomes_de_textura.em_uso());
+        secoes.poe_u32s("esc.nomes_de_buffer", self.nomes_de_buffer.em_uso());
 
         let mut conjuntos: Vec<u32> = self.installed_applets.iter().copied().collect();
         conjuntos.sort_unstable();
@@ -1317,7 +1323,17 @@ impl<C: CpuBackend> Machine<C> {
         let current_applet = numeros[6];
         let applet_class = numeros[7];
         let egl_next_handle = numeros[8];
-        let gles_next_name = numeros[9];
+        let maior_nome_antigo = numeros[9];
+        // Um estado de antes do [`super::gl::NomesGl`] só tem o contador: tudo o que ele já
+        // entregou fica em uso, que é exatamente o que o contador garantia.
+        let nomes = |secao: &str| -> Result<super::gl::NomesGl, Erro> {
+            Ok(match leitor.secao(secao) {
+                Some(_) => super::gl::NomesGl::de(leitor.u32s(secao)?),
+                None => super::gl::NomesGl::de(1..=maior_nome_antigo),
+            })
+        };
+        let nomes_de_textura = nomes("esc.nomes_de_textura")?;
+        let nomes_de_buffer = nomes("esc.nomes_de_buffer")?;
         let egl_swaps = numeros[10];
         let gl_clears = numeros[11];
         let unpack_alignment = numeros[12];
@@ -1401,7 +1417,8 @@ impl<C: CpuBackend> Machine<C> {
         self.current_applet = current_applet;
         self.applet_class = applet_class;
         self.egl_next_handle = egl_next_handle;
-        self.gles_next_name = gles_next_name;
+        self.nomes_de_textura = nomes_de_textura;
+        self.nomes_de_buffer = nomes_de_buffer;
         self.egl_swaps = egl_swaps;
         self.gl_clears = gl_clears;
         self.unpack_alignment = unpack_alignment;
@@ -2986,6 +3003,42 @@ mod tests {
         depois.clock_us = 90_000_000;
         depois.restaura_estado(&antigo).expect("o estado antigo carrega");
         assert_eq!(depois.clock_us, 90_000_000);
+    }
+
+    /// Os nomes do OpenGL ES em uso voltam com o estado, e o próximo `glGen*` não repete um nome
+    /// vivo. Um estado antigo, só com o contador, deixa em uso tudo o que o contador entregou.
+    #[test]
+    fn os_nomes_do_gl_voltam_com_o_estado() {
+        let mut antes = maquina();
+        antes.nomes_de_textura = super::super::gl::NomesGl::de([1, 2, 5]);
+        antes.nomes_de_buffer = super::super::gl::NomesGl::de([3]);
+        let arquivo = antes.grava_estado();
+
+        let mut depois = maquina();
+        depois.restaura_estado(&arquivo).expect("restaurou");
+        assert_eq!(depois.nomes_de_textura, antes.nomes_de_textura);
+        assert_eq!(depois.nomes_de_buffer, antes.nomes_de_buffer);
+        assert_eq!(
+            depois.nomes_de_textura.gera(),
+            3,
+            "o buraco do 3 é o menor livre"
+        );
+
+        let leitor = crate::save_state::Leitor::abre(&arquivo).unwrap();
+        let sem_as_secoes: Vec<(String, Vec<u8>)> = leitor
+            .nomes()
+            .into_iter()
+            .filter(|nome| !nome.starts_with("esc.nomes_de_"))
+            .map(|nome| (nome.to_string(), leitor.secao(nome).unwrap().to_vec()))
+            .collect();
+        let antigo = crate::save_state::escreve(&sem_as_secoes);
+        let mut depois = maquina();
+        depois
+            .restaura_estado(&antigo)
+            .expect("o estado antigo carrega");
+        // O campo do contador guarda o maior nome em uso, 5: do 1 ao 5 fica tudo reservado.
+        assert_eq!(depois.nomes_de_textura.gera(), 6);
+        assert_eq!(depois.nomes_de_buffer.gera(), 6);
     }
 
     /// O arquivo da Machine inclui o estado do rasterizador, e nao apenas a prova isolada do
