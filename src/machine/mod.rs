@@ -2693,8 +2693,9 @@ pub struct Machine<C: CpuBackend> {
     egl_swaps: u32,
     /// Quantos `glClear` limparam a cor. Ver [`Machine::gl_swaps`].
     gl_clears: u32,
-    /// Último nome de textura ou buffer entregue pelo OpenGL ES.
-    gles_next_name: u32,
+    /// Os nomes de textura e de buffer em uso no OpenGL ES. Ver [`gl::NomesGl`].
+    nomes_de_textura: gl::NomesGl,
+    nomes_de_buffer: gl::NomesGl,
     /// O objeto `IGLES11`, criado sob demanda pelo `QueryInterface` do EGL.
     gles_object: u32,
     /// Superfície e contexto correntes do EGL.
@@ -3273,7 +3274,8 @@ impl<C: CpuBackend> Machine<C> {
             egl_next_handle: EGL_HANDLE_BASE,
             egl_swaps: 0,
             gl_clears: 0,
-            gles_next_name: 0,
+            nomes_de_textura: gl::NomesGl::default(),
+            nomes_de_buffer: gl::NomesGl::default(),
             gles_object: 0,
             egl_surface: 0,
             egl_context: 0,
