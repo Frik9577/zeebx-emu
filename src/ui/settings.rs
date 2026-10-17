@@ -649,7 +649,7 @@ impl Settings {
         settings.controls.adopt();
         settings.adota_o_limite_antigo();
         if let Some(texto) = &texto {
-            settings.adota_o_atalho_de_reiniciar(texto);
+            settings.adota_o_atalho_de_reiniciar(texto, path);
         }
         settings
     }
@@ -660,19 +660,35 @@ impl Settings {
     /// posto num: o atalho, perguntado antes do jogo, roubaria o botão, e um toque nele
     /// reiniciaria a partida. Só vale para o arquivo que ainda não conhecia o atalho — quem o
     /// escolheu depois escolheu.
-    fn adota_o_atalho_de_reiniciar(&mut self, texto: &str) {
+    ///
+    /// **As configurações de cada jogo contam também.** O atalho é um só, e um jogo com o R num
+    /// botão perderia o botão do mesmo jeito. Elas moram em `jogos/`, ao lado de `path`.
+    fn adota_o_atalho_de_reiniciar(&mut self, texto: &str, path: &Path) {
         let conhecia = serde_json::from_str::<serde_json::Value>(texto)
             .ok()
             .is_some_and(|valor| valor.pointer("/atalhos/reiniciar").is_some());
+        if conhecia {
+            return;
+        }
         let tecla = Atalhos::REINICIAR_PADRAO;
-        let usada = self.controls.players.iter().any(|jogador| {
-            jogador
-                .buttons
-                .values()
-                .flatten()
-                .any(|fonte| matches!(fonte, Source::Key { name } if name == tecla))
-        });
-        if !conhecia && usada {
+        let usa = |controles: &crate::input::bindings::Controls| {
+            controles.players.iter().any(|jogador| {
+                jogador
+                    .buttons
+                    .values()
+                    .flatten()
+                    .any(|fonte| matches!(fonte, Source::Key { name } if name == tecla))
+            })
+        };
+        let algum_jogo = || {
+            let Some(pasta) = path.parent().map(|dir| dir.join("jogos")) else {
+                return false;
+            };
+            std::fs::read_dir(pasta).into_iter().flatten().flatten().any(|entrada| {
+                ConfigDoJogo::carrega_de(&entrada.path()).is_some_and(|jogo| usa(&jogo.controls))
+            })
+        };
+        if usa(&self.controls) || algum_jogo() {
             self.atalhos.reiniciar.clear();
         }
     }
@@ -918,6 +934,13 @@ mod tests {
         // Gravado com o atalho, ele vale mesmo com o R num botão: foi escolha.
         com_r.save_to(&path).unwrap();
         assert_eq!(Settings::load_from(&path).atalhos.reiniciar, "R");
+
+        // O R num botão de um jogo só, com as gerais sem ele, também deixa o atalho sem tecla.
+        let mut jogo = ConfigDoJogo::das(&Settings::default());
+        jogo.controls.player_mut(0).bind("b4", Source::key("R"));
+        jogo.grava_em(&dir.join("jogos").join("01234567.json")).unwrap();
+        std::fs::write(&path, r#"{ "roms_dir": "/jogos" }"#).unwrap();
+        assert_eq!(Settings::load_from(&path).atalhos.reiniciar, "", "o R do jogo virou reinício");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
