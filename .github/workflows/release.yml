@@ -73,7 +73,7 @@ jobs:
 
       # Cache separado do standalone porque os perfis de build diferem — lá o `cargo-packager`
       # entra na conta. As dependências são quase as mesmas: o `zeebx` é a biblioteca inteira, e
-      # fora do Android ela traz o eframe e companhia por conta própria.
+      # fora do Android ela traz o `rfd`, o Discord e companhia por conta própria.
       - uses: Swatinem/rust-cache@v2
         with:
           key: headless-${{ matrix.nome }}
