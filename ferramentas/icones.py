@@ -31,6 +31,7 @@ QML = RAIZ / "frontends" / "qt-standalone" / "qml" / "Icone.qml"
 
 # Os ícones da interface, pelo nome da Lucide.
 ICONES = [
+    "bug",  # depuração
     "calendar-clock",  # liberar a sincronização do Zeeboids
     "camera",  # screenshot
     "circle-help",
@@ -41,13 +42,16 @@ ICONES = [
     "folder-open",  # carregar estado
     "gallery-horizontal",  # a biblioteca em slider
     "gamepad-2",  # controles
+    "gauge",  # velocidade
     "hard-drive",  # o gerenciador de saves
     "info",  # sobre
+    "keyboard",  # atalhos
     "layout-grid",  # a biblioteca em grade
     "log-out",  # sair
     "maximize",  # tela cheia
     "message-circle",  # o Discord
     "minimize",
+    "monitor",  # gráficos
     "pause",
     "play",
     "refresh-cw",  # procurar os jogos de novo
@@ -58,6 +62,7 @@ ICONES = [
     "settings",
     "square",  # fechar o jogo
     "undo-2",  # desfazer carregar
+    "volume-2",  # áudio
     "x",
 ]
 
