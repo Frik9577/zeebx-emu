@@ -36,6 +36,7 @@ função não está aqui.
 | [24-velocidade.md](24-velocidade.md) | Limite de quadros, frameskip, fast-forward, turbo e rewind: o ritmo do jogo contra o relógio do mundo |
 | [25-save-state-no-desktop.md](25-save-state-no-desktop.md) | Os dez slots por jogo, o salvar e o carregar com a placa, o desfazer, e os atalhos com o ⌘ do Mac |
 | [26-temas.md](26-temas.md) | As paletas sobre o Fusion, o arquivo de cada tema, como a cor chega às janelas e a conta do contraste |
+| [27-moldura-da-janela.md](27-moldura-da-janela.md) | A barra de menus, a de ferramentas com os ícones da Lucide e a de status em volta da biblioteca |
 
 ## Como medir
 
