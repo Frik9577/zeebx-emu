@@ -700,6 +700,8 @@ fn booleano<'a>(settings: &'a mut Settings, chave: &str) -> Option<&'a mut bool>
         "debug.log" => &mut settings.debug.log,
         "debug.gravar_sessao" => &mut settings.debug.gravar_sessao,
         "movimento.aviso_de_calibracao" => &mut settings.movimento.aviso_de_calibracao,
+        "barras.ferramentas" => &mut settings.barras.ferramentas,
+        "barras.status" => &mut settings.barras.status,
         "speed.ff.mute" => &mut settings.velocidade.avanco.sem_som,
         "speed.rewind.on" => &mut settings.velocidade.rewind.ligado,
         _ => return None,
