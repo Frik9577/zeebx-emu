@@ -1078,6 +1078,14 @@ ApplicationWindow {
                     visible: !janela.doJogo
                     text: janela.tr("graphics.window.hint")
                 }
+                // Como o "Render to Separate Window" do PCSX2: desligado, o jogo é desenhado na
+                // principal, no lugar da biblioteca.
+                Opcao {
+                    visible: !janela.doJogo
+                    chave: "graphics.jogo_separado"
+                    rotulo: "graphics.separate_window"
+                    dica: "graphics.separate_window.hint"
+                }
 
                 Titulo { text: janela.tr("graphics.scaling") }
                 Repeater {
