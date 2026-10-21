@@ -3,8 +3,8 @@
 A segunda fase da repaginada da interface, na linha do PCSX2 2.x: a janela da biblioteca ganha
 barra de menus, barra de ferramentas e barra de status. **A grade e o slider ficam como eram**; o
 que muda é o que vai em volta deles. A primeira fase foram os temas ([26](26-temas.md)); as
-próximas são o jogo desenhado dentro da janela principal e as configurações com uma barra lateral
-de categorias.
+seguintes, o jogo desenhado dentro da janela principal ([28](28-jogo-na-janela-principal.md)) e as
+configurações com uma barra lateral de categorias ([29](29-configuracoes-com-barra-lateral.md)).
 
 A linha de botões soltos que havia em cima (Z-Wheel, busca, Saves, Configurações, Liberar sync) e a
 linha da contagem com o "Procurar de novo" saíram: cada coisa foi para um menu, para a barra de
@@ -84,7 +84,7 @@ a cor é a do texto, e acompanha o tema sem imagem para recolorir; e o Qt não p
 QtSvg, que o `.deb`, o `windeployqt` e o `macdeployqt` teriam de levar junto.
 
 A fonte inteira tem 2150 ícones e 900 KB. O [`ferramentas/icones.py`](../../ferramentas/icones.py)
-recorta só os que a interface usa (28, 11 KB, em `assets/icones/lucide.ttf`, embutida no binário)
+recorta só os que a interface usa (33, com 13 KB, em `assets/icones/lucide.ttf`, embutida no binário)
 e escreve a tabela de nomes do `Icone.qml`. Para acrescentar um ícone, o nome entra na lista do
 script e ele roda de novo, sobre o pacote `lucide-static` da mesma versão. A licença é ISC, e MIT
 para os ícones que vieram do Feather; as duas estão em `ferramentas/licencas/lucide-LICENSE` e no
