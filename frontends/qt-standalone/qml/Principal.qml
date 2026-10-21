@@ -32,7 +32,7 @@ ApplicationWindow {
     height: alturaGuardada > 0 ? alturaGuardada : 720
     minimumWidth: 480
     minimumHeight: 360
-    title: "Zeebx"
+    title: jogandoNaPrincipal ? "Zeebx — " + palcoDaPrincipal.tela.estado : "Zeebx"
 
     // O tamanho em que a janela foi fechada é o tamanho em que ela abre. Chamadas de
     // função não têm sinal de mudança: avaliam uma vez, na montagem, que é quando valem.
@@ -57,6 +57,9 @@ ApplicationWindow {
         onTriggered: principal.guardaTamanho()
     }
 
+    // A janela perdeu o foco com o jogo nela: nenhuma tecla continua apertada.
+    onActiveChanged: if (!active && jogandoNaPrincipal) palcoDaPrincipal.tela.solta()
+
     // Fechar a biblioteca encerra tudo, com ou sem jogo aberto — como no egui.
     onClosing: {
         filaDaGravacao.stop()
@@ -78,6 +81,9 @@ ApplicationWindow {
     // O modo configurado para a janela principal (`graphics.janela`), como no egui. As
     // configurações chamam isto de novo quando ele muda: na principal, vale na hora.
     function aplicaModo() {
+        // Com o jogo nela, vale o modo do jogo; o da principal volta quando ele fechar.
+        if (jogandoNaPrincipal)
+            return
         const modo = biblioteca.modoDaJanela()
         if (modo === 2)
             showFullScreen()
@@ -93,10 +99,65 @@ ApplicationWindow {
     }
 
     // `erro` vazio é jogo aberto.
+    //
+    // **Onde o jogo aparece só se decide sem jogo rodando.** Um jogo aberto por cima de outro (a
+    // biblioteca usada com a janela separada, ou a Z-Wheel) fica onde o anterior estava: com os
+    // dois palcos ativos, o núcleo andaria duas vezes por quadro. A opção vale no próximo jogo.
     function mostra(erro) {
         aviso.text = erro
-        if (erro === "")
+        if (erro !== "")
+            return
+        if (jogo.visible)
             jogo.abre()
+        else if (jogandoNaPrincipal || !configuracoes.cfg.valor("graphics.jogo_separado"))
+            jogaNaPrincipal()
+        else
+            jogo.abre()
+    }
+
+    // O jogo na principal, no lugar da biblioteca. A janela fica no modo configurado para o jogo
+    // (`graphics.janela_do_jogo`) enquanto ele roda, e volta ao que era quando ele fecha.
+    property bool jogandoNaPrincipal: false
+    property int visibilidadeAntesDoJogo: Window.Windowed
+    // O palco onde o jogo está, para o menu, a barra de ferramentas e a de status.
+    readonly property var palco: jogandoNaPrincipal ? palcoDaPrincipal : jogo.palco
+    readonly property bool jogando: jogo.visible || jogandoNaPrincipal
+
+    function jogaNaPrincipal() {
+        if (!jogandoNaPrincipal) {
+            visibilidadeAntesDoJogo = visibility
+            jogandoNaPrincipal = true
+            const modo = palcoDaPrincipal.tela.modoDaJanela()
+            if (modo === 2)
+                showFullScreen()
+            else if (modo === 1)
+                showMaximized()
+            else
+                showNormal()
+        }
+        palcoDaPrincipal.prepara()
+        palcoDaPrincipal.foca()
+        raise()
+        requestActivate()
+    }
+
+    // Fecha o jogo de onde ele estiver. Na principal, a biblioteca volta, com a janela como era.
+    function fechaJogo() {
+        if (jogo.visible) {
+            jogo.close()
+            return
+        }
+        if (!jogandoNaPrincipal)
+            return
+        palcoDaPrincipal.fecha()
+        jogandoNaPrincipal = false
+        if (visibilidadeAntesDoJogo === Window.FullScreen)
+            showFullScreen()
+        else if (visibilidadeAntesDoJogo === Window.Maximized)
+            showMaximized()
+        else
+            showNormal()
+        principal.vista.forceActiveFocus()
     }
 
     // O jogo escolhido agora, pela linha da lista.
@@ -178,10 +239,10 @@ ApplicationWindow {
     JanelaDeLog {
         id: janelaDeLog
 
-        transientParent: jogo
+        transientParent: principal.jogandoNaPrincipal ? principal : jogo
 
         pedida: principal.depende([configuracoes.cfg.versao, janelaDeLog.dispensas],
-                                  jogo.visible && janelaDeLog.log.ativo())
+                                  principal.jogando && janelaDeLog.log.ativo())
     }
 
     Avisos {
@@ -192,7 +253,7 @@ ApplicationWindow {
     // principal voltar a ter o foco. Mapeando o controle nas configurações, o botão apertado
     // abriria um jogo sem querer. O mouse continua valendo, como no egui. Toda janela que abrir
     // por cima da principal entra aqui.
-    readonly property bool sobreposta: jogo.visible || configuracoes.visible || saves.visible
+    readonly property bool sobreposta: principal.jogando || configuracoes.visible || saves.visible
                                        || configuracoesDoJogo.visible || detalhes.visible
                                        || boasVindas.visible || novaVersao.visible
                                        || sobre.visible || respostaDaProcura.visible
@@ -252,6 +313,7 @@ ApplicationWindow {
     // avisa no terminal.
     Shortcut {
         sequences: [StandardKey.Find]
+        enabled: !principal.jogandoNaPrincipal
         onActivated: busca.forceActiveFocus()
     }
 
@@ -336,7 +398,7 @@ ApplicationWindow {
         enabled: acao === 0 || principal.ocupadosDoMenu[slot] === 1
         atalho: slot === principal.slotDoMenu
                 ? principal.atalho(acao === 0 ? "salvar_estado" : "carregar_estado") : ""
-        onTriggered: jogo.tela.estadoPeloMenu(acao, slot)
+        onTriggered: principal.palco.tela.estadoPeloMenu(acao, slot)
     }
 
     // Um botão da barra de ferramentas: o ícone, e o nome ao lado enquanto couber. **Não pega o
@@ -378,8 +440,13 @@ ApplicationWindow {
         color: palette.mid
     }
 
+    // Com o jogo na principal em tela cheia, as três barras saem, como no PCSX2: a tela é do jogo.
+    readonly property bool soOJogo: jogandoNaPrincipal && visibility === Window.FullScreen
+
     menuBar: MenuBar {
         id: barraDeMenus
+
+        visible: !principal.soOJogo
 
         // Com um menu aberto, o controle não navega a biblioteca por baixo dele.
         readonly property bool aberto: menuArquivo.visible || menuSistema.visible
@@ -420,26 +487,26 @@ ApplicationWindow {
 
             title: tr("menu.system")
             onAboutToShow: {
-                principal.slotsDoMenu = jogo.visible ? jogo.tela.slotsDeEstado() : []
-                principal.ocupadosDoMenu = jogo.visible ? jogo.tela.slotsOcupados() : []
-                principal.slotDoMenu = jogo.visible ? jogo.tela.slotAtual() : 0
-                itemDoAvanco.checked = jogo.visible && jogo.tela.avancoFixo()
-                itemDoDesfazer.enabled = jogo.visible && jogo.tela.podeDesfazerCarregar()
+                principal.slotsDoMenu = principal.jogando ? principal.palco.tela.slotsDeEstado() : []
+                principal.ocupadosDoMenu = principal.jogando ? principal.palco.tela.slotsOcupados() : []
+                principal.slotDoMenu = principal.jogando ? principal.palco.tela.slotAtual() : 0
+                itemDoAvanco.checked = principal.jogando && principal.palco.tela.avancoFixo()
+                itemDoDesfazer.enabled = principal.jogando && principal.palco.tela.podeDesfazerCarregar()
             }
 
             ItemDeMenu {
-                icone: jogo.pausado ? "play" : "pause"
-                text: tr(jogo.pausado ? "menu.system.resume" : "menu.system.pause")
+                icone: principal.palco.pausado ? "play" : "pause"
+                text: tr(principal.palco.pausado ? "menu.system.resume" : "menu.system.pause")
                 atalho: "P"
-                enabled: jogo.visible
-                onTriggered: jogo.pausa()
+                enabled: principal.jogando
+                onTriggered: principal.palco.pausa()
             }
             ItemDeMenu {
                 icone: "rotate-ccw"
                 text: tr("menu.system.restart")
                 atalho: principal.atalho("reiniciar")
-                enabled: jogo.visible
-                onTriggered: jogo.reinicia()
+                enabled: principal.jogando
+                onTriggered: principal.palco.reinicia()
             }
             MenuSeparator {}
             ItemDeMenu {
@@ -448,15 +515,15 @@ ApplicationWindow {
                 checkable: true
                 text: tr("menu.system.fast_forward")
                 atalho: principal.atalho("avancar")
-                enabled: jogo.visible
-                onTriggered: checked = jogo.tela.alternaAvanco()
+                enabled: principal.jogando
+                onTriggered: checked = principal.palco.tela.alternaAvanco()
             }
             ItemDeMenu {
                 icone: "camera"
                 text: tr("menu.system.screenshot")
                 atalho: principal.atalho("screenshot")
-                enabled: jogo.visible
-                onTriggered: jogo.screenshot()
+                enabled: principal.jogando
+                onTriggered: principal.palco.screenshot()
             }
             MenuSeparator {}
             Menu {
@@ -464,7 +531,7 @@ ApplicationWindow {
                 // Largura que caiba o slot ocupado: o Menu mede os itens na primeira vez que abre,
                 // e não cresce quando um slot vazio passa a ocupado.
                 width: Math.max(implicitWidth, 340)
-                enabled: jogo.visible
+                enabled: principal.jogando
 
                 ItemDeSlot { slot: 0; icone: "save" }
                 ItemDeSlot { slot: 1; icone: "save" }
@@ -482,7 +549,7 @@ ApplicationWindow {
                 // Largura que caiba o slot ocupado: o Menu mede os itens na primeira vez que abre,
                 // e não cresce quando um slot vazio passa a ocupado.
                 width: Math.max(implicitWidth, 340)
-                enabled: jogo.visible
+                enabled: principal.jogando
 
                 ItemDeSlot { slot: 0; acao: 1; icone: "folder-open" }
                 ItemDeSlot { slot: 1; acao: 1; icone: "folder-open" }
@@ -501,15 +568,15 @@ ApplicationWindow {
                 icone: "undo-2"
                 text: tr("menu.system.undo_load")
                 atalho: principal.atalho("desfazer_carregar")
-                onTriggered: jogo.tela.estadoPeloMenu(2, -1)
+                onTriggered: principal.palco.tela.estadoPeloMenu(2, -1)
             }
             MenuSeparator {}
             ItemDeMenu {
                 icone: "square"
                 text: tr("menu.system.close")
                 atalho: "Esc"
-                enabled: jogo.visible
-                onTriggered: jogo.close()
+                enabled: principal.jogando
+                onTriggered: principal.fechaJogo()
             }
         }
 
@@ -649,7 +716,7 @@ ApplicationWindow {
     // A barra de ferramentas: o que se faz na biblioteca, o que se faz com o jogo aberto, as
     // configurações, e à direita a vista e a busca, como no PCSX2.
     header: ToolBar {
-        visible: principal.comFerramentas
+        visible: principal.comFerramentas && !principal.soOJogo
 
         RowLayout {
             anchors.fill: parent
@@ -676,22 +743,22 @@ ApplicationWindow {
             }
             Separador {}
             BotaoDeFerramenta {
-                icone: jogo.pausado ? "play" : "pause"
-                text: tr(jogo.pausado ? "menu.system.resume" : "menu.system.pause")
-                enabled: jogo.visible
-                onClicked: jogo.pausa()
+                icone: principal.palco.pausado ? "play" : "pause"
+                text: tr(principal.palco.pausado ? "menu.system.resume" : "menu.system.pause")
+                enabled: principal.jogando
+                onClicked: principal.palco.pausa()
             }
             BotaoDeFerramenta {
                 icone: "rotate-ccw"
                 text: tr("menu.system.restart")
-                enabled: jogo.visible
-                onClicked: jogo.reinicia()
+                enabled: principal.jogando
+                onClicked: principal.palco.reinicia()
             }
             BotaoDeFerramenta {
                 icone: "square"
                 text: tr("toolbar.close")
-                enabled: jogo.visible
-                onClicked: jogo.close()
+                enabled: principal.jogando
+                onClicked: principal.fechaJogo()
             }
             Separador {}
             BotaoDeFerramenta {
@@ -720,6 +787,7 @@ ApplicationWindow {
             // troca feita pelo menu ou pelas configurações não apareceria aqui.
             ToolButton {
                 focusPolicy: Qt.NoFocus
+                visible: !principal.jogandoNaPrincipal
                 checked: !principal.emSlider
                 contentItem: Icone { nome: "layout-grid"; tamanho: 18; color: palette.buttonText }
                 onClicked: configuracoes.cfg.define("biblioteca", 0)
@@ -729,6 +797,7 @@ ApplicationWindow {
             }
             ToolButton {
                 focusPolicy: Qt.NoFocus
+                visible: !principal.jogandoNaPrincipal
                 checked: principal.emSlider
                 contentItem: Icone { nome: "gallery-horizontal"; tamanho: 18; color: palette.buttonText }
                 onClicked: configuracoes.cfg.define("biblioteca", 1)
@@ -741,6 +810,7 @@ ApplicationWindow {
             // o escolhido, que é o primeiro resultado enquanto ninguém mexe na escolha.
             TextField {
                 id: busca
+                visible: !principal.jogandoNaPrincipal
 
                 Layout.preferredWidth: 240
                 Layout.leftMargin: 6
@@ -795,7 +865,7 @@ ApplicationWindow {
     // o nome dele, onde ele desenha, e a velocidade da última amostra, como no PCSX2.
     footer: ToolBar {
         position: ToolBar.Footer
-        visible: principal.comStatus
+        visible: principal.comStatus && !principal.soOJogo
 
         RowLayout {
             anchors.fill: parent
@@ -813,16 +883,29 @@ ApplicationWindow {
                 text: tr("library.controls_hint") + " · " + tr("library.pad_game")
             }
             Label {
-                visible: jogo.visible && text !== ""
-                text: jogo.tela.estado + (jogo.tela.velocidade !== "" ? "  ·  " + jogo.tela.velocidade : "")
+                visible: principal.jogando && text !== ""
+                text: principal.palco.tela.estado + (principal.palco.tela.velocidade !== "" ? "  ·  " + principal.palco.tela.velocidade : "")
             }
         }
+    }
+
+    // O jogo, quando ele roda na principal: no lugar da biblioteca, sem as margens dela.
+    PalcoDoJogo {
+        id: palcoDaPrincipal
+
+        anchors.fill: parent
+        visible: principal.jogandoNaPrincipal
+        ativo: principal.jogandoNaPrincipal
+        faixaDeEstado: false
+        onFechaPedido: principal.fechaJogo()
+        onTelaCheiaPedida: principal.alternaTelaCheia()
     }
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 8
         spacing: 6
+        visible: !principal.jogandoNaPrincipal
 
         // O recado da última ação que tem o que dizer, como o liberar a sincronização.
         RowLayout {
