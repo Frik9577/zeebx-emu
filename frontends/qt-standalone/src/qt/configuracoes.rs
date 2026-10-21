@@ -416,6 +416,11 @@ pub mod qobject {
         #[cxx_name = "idiomaMudou"]
         fn idioma_mudou(self: Pin<&mut Configuracoes>);
 
+        /// O tema mudou. A paleta já foi aplicada; falta o QML reler as cores de aviso e de erro.
+        #[qsignal]
+        #[cxx_name = "temaMudou"]
+        fn tema_mudou(self: Pin<&mut Configuracoes>);
+
         /// O modo da janela principal mudou: vale na hora, como no egui. O da janela do jogo vale
         /// no próximo jogo.
         #[qsignal]
@@ -670,6 +675,7 @@ struct Efeito {
     biblioteca: Option<bool>,
     idioma: bool,
     janela_principal: bool,
+    tema: bool,
 }
 
 /// As opções de liga e desliga, pela chave.
@@ -741,6 +747,11 @@ impl qobject::Configuracoes {
                     &[ModoDaBiblioteca::Grade, ModoDaBiblioteca::Slider],
                     &nucleo.settings.biblioteca,
                 ),
+                // O zero é a paleta do sistema; os temas vêm depois, na ordem do seletor.
+                "tema" => nucleo
+                    .tema()
+                    .and_then(|tema| nucleo.temas.iter().position(|t| t.chave == tema.chave))
+                    .map_or(0, |posicao| posicao as i32 + 1),
                 "graphics.janela" => indice(&ModoDaJanela::TODOS, &graficos.janela),
                 "graphics.janela_do_jogo" => indice(&ModoDaJanela::TODOS, &graficos.janela_do_jogo),
                 "graphics.scaling" => indice(&Scaling::ALL, &graficos.scaling),
@@ -817,6 +828,13 @@ impl qobject::Configuracoes {
                 "biblioteca" => {
                     let modos = [ModoDaBiblioteca::Grade, ModoDaBiblioteca::Slider];
                     nucleo.settings.biblioteca = escolha(&modos, numero).unwrap_or_default();
+                }
+                "tema" => {
+                    nucleo.settings.tema = usize::try_from(numero - 1)
+                        .ok()
+                        .and_then(|i| nucleo.temas.get(i))
+                        .map(|tema| tema.chave.clone());
+                    efeito.tema = true;
                 }
                 "graphics.janela" => {
                     graficos.janela = escolha(&ModoDaJanela::TODOS, numero).unwrap_or_default();
@@ -919,6 +937,12 @@ impl qobject::Configuracoes {
                 "language" => catalogo.languages().iter().map(|l| l.name.clone()).collect(),
                 "biblioteca" => {
                     traduz(&["settings.library_view.grid", "settings.library_view.slider"])
+                }
+                "tema" => {
+                    let idioma = catalogo.current();
+                    std::iter::once(catalogo.get("settings.theme.system").to_string())
+                        .chain(nucleo.temas.iter().map(|tema| tema.nome(idioma).to_string()))
+                        .collect()
                 }
                 "graphics.janela" | "graphics.janela_do_jogo" => {
                     ModoDaJanela::TODOS.iter().map(|m| catalogo.get(m.chave()).to_string()).collect()
@@ -1204,6 +1228,11 @@ impl qobject::Configuracoes {
         }
         if efeito.janela_principal {
             self.as_mut().janela_principal_mudou();
+        }
+        // Aqui, e não dentro do `com` da gravação: ver `tema::aplica`.
+        if efeito.tema {
+            super::tema::aplica();
+            self.as_mut().tema_mudou();
         }
     }
 }
