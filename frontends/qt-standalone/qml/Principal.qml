@@ -278,6 +278,9 @@ ApplicationWindow {
                     delay: 500
                     width: Math.min(implicitWidth, 320)
                     contentItem: Label {
+                        // A cor da dica, e não a do texto da janela: num tema de dica escura com
+                        // janela clara, o texto sumia.
+                        color: palette.toolTipText
                         wrapMode: Text.Wrap
                         text: tr(botaoZWheel.enabled ? "nav.z_wheel.hint" : "nav.z_wheel.missing")
                     }
@@ -306,6 +309,7 @@ ApplicationWindow {
                     delay: 500
                     width: Math.min(implicitWidth, 320)
                     contentItem: Label {
+                        color: palette.toolTipText
                         wrapMode: Text.Wrap
                         text: tr("nav.search.hint")
                     }
@@ -327,6 +331,7 @@ ApplicationWindow {
                     visible: botaoLimpaBusca.hovered
                     width: Math.min(implicitWidth, 320)
                     contentItem: Label {
+                        color: palette.toolTipText
                         wrapMode: Text.Wrap
                         text: tr("nav.search.clear")
                     }
@@ -363,6 +368,7 @@ ApplicationWindow {
                     delay: 500
                     width: Math.min(implicitWidth, 320)
                     contentItem: Label {
+                        color: palette.toolTipText
                         wrapMode: Text.Wrap
                         text: tr("nav.unlock_sync.hint")
                     }
@@ -423,7 +429,7 @@ ApplicationWindow {
 
             Layout.fillWidth: true
             visible: text !== ""
-            color: "#d04040"
+            color: Tema.erro
             wrapMode: Text.Wrap
         }
 
