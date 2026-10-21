@@ -118,8 +118,13 @@ impl Default for DebugView {
 pub struct Graphics {
     /// Como a janela principal abre.
     pub janela: ModoDaJanela,
-    /// Como a janela do jogo abre.
+    /// Como a janela do jogo abre. Com o jogo na janela principal, é como ela fica enquanto ele
+    /// roda; fechado o jogo, ela volta ao que era.
     pub janela_do_jogo: ModoDaJanela,
+    /// O jogo numa janela só dele, como até a 0.4.3, em vez de desenhado na principal no lugar da
+    /// biblioteca. O "Render to Separate Window" do PCSX2. Vale no próximo jogo aberto: um jogo
+    /// rodando não troca de janela.
+    pub jogo_separado: bool,
     /// O tamanho em que a janela principal estava quando foi fechada, em pontos.
     ///
     /// `None` é o padrão de fábrica (960×720). Só vale em modo janela: maximizada ou em tela
@@ -223,6 +228,7 @@ impl Default for Graphics {
         Self {
             janela: ModoDaJanela::Maximizada,
             janela_do_jogo: ModoDaJanela::Maximizada,
+            jogo_separado: false,
             tamanho_da_janela: None,
             tamanho_da_janela_do_jogo: None,
             scaling: Scaling::default(),
@@ -757,6 +763,7 @@ impl ConfigDoJogo {
             graphics: Graphics {
                 janela: janela.janela,
                 janela_do_jogo: janela.janela_do_jogo,
+                jogo_separado: janela.jogo_separado,
                 tamanho_da_janela: janela.tamanho_da_janela,
                 tamanho_da_janela_do_jogo: janela.tamanho_da_janela_do_jogo,
                 gpu_present: janela.gpu_present,
@@ -1190,6 +1197,16 @@ mod tests {
             Atalhos::SALVAR_ESTADO_PADRAO
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Quem vem da 0.4.x não tinha a opção, e passa a jogar na janela principal: é a repaginada
+    /// que todo mundo vê. A janela separada continua a um clique, em Gráficos.
+    #[test]
+    fn um_arquivo_de_antes_joga_na_janela_principal() {
+        let antigo: Settings =
+            serde_json::from_str(r#"{ "graphics": { "janela_do_jogo": "tela_cheia" } }"#).unwrap();
+        assert!(!antigo.graphics.jogo_separado);
+        assert_eq!(antigo.graphics.janela_do_jogo, ModoDaJanela::TelaCheia);
     }
 
     #[test]
