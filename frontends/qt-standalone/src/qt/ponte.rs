@@ -19,6 +19,8 @@ pub mod qobject {
         type QImage = cxx_qt_lib::QImage;
         include!("cxx-qt-lib/qlist.h");
         type QList_i32 = cxx_qt_lib::QList<i32>;
+        include!("cxx-qt-lib/qstringlist.h");
+        type QStringList = cxx_qt_lib::QStringList;
     }
 
     unsafe extern "C++Qt" {
@@ -59,6 +61,7 @@ pub mod qobject {
         #[qproperty(QString, estado_texto, cxx_name = "estadoTexto")]
         #[qproperty(bool, estado_falhou, cxx_name = "estadoFalhou")]
         #[qproperty(i32, estado_serie, cxx_name = "estadoSerie")]
+        #[qproperty(QString, velocidade)]
         #[qproperty(QString, indicadores)]
         type TelaDoJogo = super::TelaDoJogoRust;
 
@@ -99,6 +102,40 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "atalhoDeEstado"]
         fn atalho_de_estado(self: Pin<&mut Self>, codigo: i32, modificadores: i32);
+
+        /// O save state pelo menu: `acao` 0 salva, 1 carrega e 2 desfaz o último carregar, no
+        /// `slot` (de zero), que passa a ser o atual. O aviso chega pela `estadoSerie`.
+        #[qinvokable]
+        #[cxx_name = "estadoPeloMenu"]
+        fn estado_pelo_menu(self: Pin<&mut Self>, acao: i32, slot: i32);
+
+        /// Os slots do jogo aberto, um por linha, para o menu.
+        #[qinvokable]
+        #[cxx_name = "slotsDeEstado"]
+        fn slots_de_estado(self: &Self) -> QStringList;
+
+        /// Quais slots têm estado: 1 ou 0 por slot, na ordem. O Carregar do menu desabilita os
+        /// vazios.
+        #[qinvokable]
+        #[cxx_name = "slotsOcupados"]
+        fn slots_ocupados(self: &Self) -> QList_i32;
+
+        #[qinvokable]
+        #[cxx_name = "slotAtual"]
+        fn slot_atual(self: &Self) -> i32;
+
+        #[qinvokable]
+        #[cxx_name = "podeDesfazerCarregar"]
+        fn pode_desfazer_carregar(self: &Self) -> bool;
+
+        /// Liga ou desliga o fast-forward pelo menu, e devolve como ficou.
+        #[qinvokable]
+        #[cxx_name = "alternaAvanco"]
+        fn alterna_avanco(self: Pin<&mut Self>) -> bool;
+
+        #[qinvokable]
+        #[cxx_name = "avancoFixo"]
+        fn avanco_fixo(self: &Self) -> bool;
 
         /// Pausa ou retoma o jogo. Devolve se ficou pausado.
         #[qinvokable]
@@ -178,7 +215,7 @@ pub mod qobject {
 use std::pin::Pin;
 
 use cxx_qt::CxxQtType;
-use cxx_qt_lib::{QImage, QImageFormat, QList, QRectF, QString};
+use cxx_qt_lib::{QImage, QImageFormat, QList, QRectF, QString, QStringList};
 
 use zeebx::egui::Key;
 use zeebx::ui::partida::enquadra;
@@ -211,6 +248,8 @@ pub struct TelaDoJogoRust {
     estado_texto: QString,
     estado_falhou: bool,
     estado_serie: i32,
+    /// A velocidade e os quadros por segundo, para a barra de status da principal.
+    velocidade: QString,
     /// O "▶▶ 3x" do fast-forward e o "Turbo"; vazio esconde.
     indicadores: QString,
     /// A tela que foi para o `ItemDoQuadro` como imagem: série e escritas. Igual, não há o que
@@ -349,6 +388,15 @@ impl qobject::TelaDoJogo {
             let serie = self.screenshot_serie().wrapping_add(1);
             self.as_mut().set_screenshot_serie(serie);
         }
+        let velocidade = QString::from(
+            &volta
+                .ritmo
+                .map(|(velocidade, quadros)| format!("{velocidade}% · {quadros} FPS"))
+                .unwrap_or_default(),
+        );
+        if self.velocidade() != &velocidade {
+            self.as_mut().set_velocidade(velocidade);
+        }
         let indicadores = QString::from(&volta.indicadores);
         if self.indicadores() != &indicadores {
             self.as_mut().set_indicadores(indicadores);
@@ -377,14 +425,62 @@ impl qobject::TelaDoJogo {
         })
     }
 
-    pub fn atalho_de_estado(mut self: Pin<&mut Self>, codigo: i32, modificadores: i32) {
+    pub fn atalho_de_estado(self: Pin<&mut Self>, codigo: i32, modificadores: i32) {
         let Some(tecla) = tecla_do_qt(codigo) else {
             return;
         };
         let modificadores = modificadores_do_qt(modificadores);
-        let Some((aviso, restaurou)) =
-            nucleo::com(|nucleo| nucleo.atalho_de_estado(tecla, modificadores))
-        else {
+        let resposta = nucleo::com(|nucleo| nucleo.atalho_de_estado(tecla, modificadores));
+        self.mostra_aviso_de_estado(resposta);
+    }
+
+    pub fn estado_pelo_menu(self: Pin<&mut Self>, acao: i32, slot: i32) {
+        let pedido = match acao {
+            0 => nucleo::PedidoDeEstado::Salvar,
+            1 => nucleo::PedidoDeEstado::Carregar,
+            _ => nucleo::PedidoDeEstado::Desfazer,
+        };
+        let slot = usize::try_from(slot).ok();
+        let resposta = nucleo::com(|nucleo| nucleo.faz_estado(pedido, slot));
+        self.mostra_aviso_de_estado(resposta);
+    }
+
+    pub fn slots_de_estado(&self) -> QStringList {
+        let slots = nucleo::com(|nucleo| nucleo.slots_de_estado());
+        let mut lista = QStringList::default();
+        for slot in &slots {
+            lista.append(QString::from(slot));
+        }
+        lista
+    }
+
+    pub fn slots_ocupados(&self) -> QList<i32> {
+        let ocupados = nucleo::com(|nucleo| nucleo.slots_ocupados());
+        QList::from(ocupados.into_iter().map(i32::from).collect::<Vec<_>>())
+    }
+
+    pub fn slot_atual(&self) -> i32 {
+        nucleo::com(|nucleo| nucleo.slot_atual() as i32)
+    }
+
+    pub fn pode_desfazer_carregar(&self) -> bool {
+        nucleo::com(|nucleo| nucleo.pode_desfazer_carregar())
+    }
+
+    pub fn alterna_avanco(self: Pin<&mut Self>) -> bool {
+        nucleo::com(|nucleo| nucleo.alterna_o_avanco_fixo())
+    }
+
+    pub fn avanco_fixo(&self) -> bool {
+        nucleo::com(|nucleo| nucleo.avanco_fixo())
+    }
+
+    /// O aviso de um pedido do save state, pelo atalho ou pelo menu.
+    fn mostra_aviso_de_estado(
+        mut self: Pin<&mut Self>,
+        resposta: Option<(nucleo::AvisoDeEstado, bool)>,
+    ) {
+        let Some((aviso, restaurou)) = resposta else {
             return;
         };
         // **O console voltou a outro instante**, e a tela restaurada pode ter a mesma série e as
