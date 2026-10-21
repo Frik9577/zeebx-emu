@@ -276,6 +276,9 @@ impl Default for Audio {
 pub struct Settings {
     /// Idioma da interface. `None` significa "o do sistema".
     pub language: Option<String>,
+    /// O tema da interface, pela chave do arquivo (`rubi`). `None` é a paleta do sistema, que era
+    /// a única até os temas existirem. Ver [`crate::ui::temas`].
+    pub tema: Option<String>,
     /// Onde procurar os jogos.
     pub roms_dir: Option<PathBuf>,
     /// O pacote da Z-Wheel: abre pela barra de cima e empresta as capas à biblioteca.
@@ -959,6 +962,7 @@ mod tests {
 
         let settings = Settings {
             language: Some("pt-BR".into()),
+            tema: Some("esmeralda".into()),
             roms_dir: Some(PathBuf::from("/jogos/zeebo")),
             z_wheel_path: Some(PathBuf::from("/jogos/Z-Wheel.zip")),
             screenshots_dir: Some(PathBuf::from("/imagens/zeebo")),
