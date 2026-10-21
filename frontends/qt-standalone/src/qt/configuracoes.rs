@@ -687,6 +687,7 @@ fn booleano<'a>(settings: &'a mut Settings, chave: &str) -> Option<&'a mut bool>
         "atualizacoes.ao_abrir" => &mut settings.atualizacoes.ao_abrir,
         "atualizacoes.pre_lancamentos" => &mut settings.atualizacoes.pre_lancamentos,
         "graphics.smooth" => &mut settings.graphics.smooth,
+        "graphics.jogo_separado" => &mut settings.graphics.jogo_separado,
         "graphics.keep_aspect" => &mut settings.graphics.keep_aspect,
         "graphics.neblina" => &mut settings.graphics.neblina,
         "graphics.gpu_rasterizer" => &mut settings.graphics.gpu_rasterizer,
