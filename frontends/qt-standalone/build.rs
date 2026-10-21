@@ -26,7 +26,7 @@ fn interface_qt() {
 
     CxxQtBuilder::new_qml_module(
         QmlModule::new("zeebx")
-            .qml_files(["qml/Principal.qml", "qml/Jogo.qml", "qml/GradeDaBiblioteca.qml", "qml/SliderDaBiblioteca.qml", "qml/JanelaDeConfiguracoes.qml", "qml/JanelaDeSaves.qml", "qml/JanelaDeLog.qml"])
+            .qml_files(["qml/Principal.qml", "qml/Jogo.qml", "qml/GradeDaBiblioteca.qml", "qml/SliderDaBiblioteca.qml", "qml/JanelaDeConfiguracoes.qml", "qml/JanelaDeSaves.qml", "qml/JanelaDeLog.qml", "qml/Icone.qml"])
             .depend("QtQuick"),
     )
     .files(["src/qt/ponte.rs", "src/qt/biblioteca.rs", "src/qt/configuracoes.rs", "src/qt/auxiliares.rs", "src/qt/tema.rs"])
@@ -39,13 +39,14 @@ fn interface_qt() {
         "src/qt/cpp/imagens.cpp",
         "src/qt/cpp/paleta.cpp",
     ])
-    // A imagem do aviso de calibração e a logo do ícone, em `qrc:/zeebx/`. O `assets/` é do
-    // projeto, e não deste pacote.
+    // A imagem do aviso de calibração, a logo do ícone e a fonte dos ícones da interface, em
+    // `qrc:/zeebx/`. O `assets/` é do projeto, e não deste pacote.
     .qrc_resources(cxx_qt_build::QResources::new().resource(
         cxx_qt_build::QResource::new()
             .prefix("/zeebx")
             .file(qt_build_utils::QResourceFile::new("../../assets/boomerang.png").alias("boomerang.png"))
-            .file(qt_build_utils::QResourceFile::new("../../assets/zeebx.png").alias("zeebx.png")),
+            .file(qt_build_utils::QResourceFile::new("../../assets/zeebx.png").alias("zeebx.png"))
+            .file(qt_build_utils::QResourceFile::new("../../assets/icones/lucide.ttf").alias("lucide.ttf")),
     ))
     .qt_module("Quick")
     // O Qt Qml pede o Network no macOS.
