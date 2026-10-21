@@ -144,6 +144,15 @@ Window {
         // "pausa", "play" ou "reinicio".
         property string forma: ""
 
+        // O desenhista de curvas do Qt 6.6, de borda suave sem multiamostragem. **Atribuído só
+        // onde existe**: escrito como propriedade da `Shape`, o Qt 6.4 do Ubuntu 24.04 recusava o
+        // `Jogo.qml` inteiro, e com ele a janela principal, que não abria. Lá fica o desenhista
+        // padrão.
+        function curvasSuaves(forma) {
+            if (forma.preferredRendererType !== undefined)
+                forma.preferredRendererType = Shape.CurveRenderer
+        }
+
         // Mostra `qual`. O que não `fica` some sozinho, esmaecendo.
         function mostra(qual, fica) {
             saida.stop()
@@ -205,7 +214,7 @@ Window {
             width: 44
             height: 48
             visible: simbolo.forma === "play"
-            preferredRendererType: Shape.CurveRenderer
+            Component.onCompleted: simbolo.curvasSuaves(this)
 
             ShapePath {
                 fillColor: "white"
@@ -225,7 +234,7 @@ Window {
             width: 56
             height: 56
             visible: simbolo.forma === "reinicio"
-            preferredRendererType: Shape.CurveRenderer
+            Component.onCompleted: simbolo.curvasSuaves(this)
 
             ShapePath {
                 fillColor: "transparent"
