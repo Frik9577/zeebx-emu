@@ -290,6 +290,8 @@ pub struct Settings {
     /// Como a biblioteca mostra os jogos.
     pub biblioteca: ModoDaBiblioteca,
     pub movimento: Movimento,
+    /// As barras da janela principal que se escondem pelo menu Exibir.
+    pub barras: Barras,
     pub controles_na_tela: ControlesNaTela,
     pub graphics: Graphics,
     pub velocidade: Velocidade,
@@ -543,6 +545,24 @@ impl Default for Discord {
         Self {
             ativo: true,
             capas_url: String::new(),
+        }
+    }
+}
+
+/// As barras da janela principal, como o PCSX2 deixa esconder: a de ferramentas, embaixo do menu,
+/// e a de status, no pé da janela. As duas aparecem de fábrica.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Barras {
+    pub ferramentas: bool,
+    pub status: bool,
+}
+
+impl Default for Barras {
+    fn default() -> Self {
+        Self {
+            ferramentas: true,
+            status: true,
         }
     }
 }
@@ -980,6 +1000,10 @@ mod tests {
             biblioteca: ModoDaBiblioteca::Slider,
             movimento: Movimento {
                 aviso_de_calibracao: false,
+            },
+            barras: Barras {
+                ferramentas: false,
+                status: true,
             },
             controles_na_tela: ControlesNaTela {
                 modo: ModoDosControlesNaTela::Nunca,
