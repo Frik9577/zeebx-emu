@@ -34,6 +34,7 @@ use zeebx::ui::partida::{self, Abertura, Partida, Relatorio, Saida, TurboDaVolta
 use zeebx::ui::estados;
 use zeebx::ui::screenshot;
 use zeebx::ui::settings::{self, Combinacao, ConfigDoJogo, Modificadores, Proporcao, Settings};
+use zeebx::ui::temas::{self, Tema};
 use zeebx::video::rasterizer::QuadroNaPlaca;
 use zeebx::video::display::Framebuffer;
 
@@ -142,6 +143,9 @@ pub enum Quadro<'a> {
 pub struct Nucleo {
     pub settings: Settings,
     pub catalogo: Catalog,
+    /// Os temas de fábrica e os das pastas, lidos uma vez na abertura, como os idiomas. Ver
+    /// [`zeebx::ui::temas`].
+    pub temas: Vec<Tema>,
     pub entrada: EntradaDoDesktop,
     /// O desenho do controle, com a silhueta de cada botão. Vazio se o desenho não abrir: a tela
     /// de controles continua servindo pela lista.
@@ -225,6 +229,7 @@ impl Nucleo {
         let mut nucleo = Self {
             settings,
             catalogo,
+            temas: temas::carrega(&temas::pastas()),
             entrada: EntradaDoDesktop::inicia(),
             arte: PadArt::builtin()
                 .inspect_err(|erro| eprintln!("desenho do controle: {erro:?}"))
@@ -292,6 +297,13 @@ impl Nucleo {
 
     /// Troca o idioma da interface. Os nomes oficiais da Z-Wheel são por idioma, então a lista é
     /// refeita junto. Devolve se o idioma existe.
+    /// O tema escolhido, se há um e ele foi lido. Um tema que sumiu da pasta, ou que não abriu, é
+    /// a paleta do sistema, sem apagar a escolha: devolvido o arquivo, o tema volta.
+    pub fn tema(&self) -> Option<&Tema> {
+        let chave = self.settings.tema.as_deref()?;
+        self.temas.iter().find(|tema| tema.chave == chave)
+    }
+
     pub fn muda_idioma(&mut self, codigo: &str) -> bool {
         if !self.catalogo.select(codigo) {
             return false;
