@@ -101,6 +101,7 @@ ApplicationWindow {
         id: cfg
 
         onIdiomaMudou: Idioma.recarrega()
+        onTemaMudou: Tema.recarrega()
         onBibliotecaMudou: (varrer) => {
             if (varrer)
                 janela.biblioteca.procuraDeNovo()
@@ -250,7 +251,7 @@ ApplicationWindow {
                 }
                 Label {
                     visible: janela.depende([cfg.versao], cfg.pastaDeRomsFalta())
-                    color: "#e0a030"
+                    color: Tema.aviso
                     text: janela.tr("common.folder_missing")
                 }
 
@@ -289,6 +290,16 @@ ApplicationWindow {
                     onActivated: (indice) => janela.define("language", indice)
                 }
 
+                // A paleta muda na hora, em todas as janelas: ver `docs/implementacao/26-temas.md`.
+                Titulo { text: janela.tr("settings.theme") }
+                Dica { text: janela.tr("settings.theme.hint") }
+                ComboBox {
+                    Layout.preferredWidth: 280
+                    model: janela.depende([Idioma.versao], cfg.opcoes("tema"))
+                    currentIndex: janela.v("tema")
+                    onActivated: (indice) => janela.define("tema", indice)
+                }
+
                 Titulo { text: janela.tr("settings.library_view") }
                 Dica { text: janela.tr("settings.library_view.hint") }
                 ComboBox {
@@ -324,7 +335,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
                     opacity: janela.depende([cfg.versao], cfg.zWheelAchada()) ? 0.6 : 1
-                    color: janela.depende([cfg.versao], cfg.zWheelAchada()) ? palette.windowText : "#e0a030"
+                    color: janela.depende([cfg.versao], cfg.zWheelAchada()) ? palette.windowText : Tema.aviso
                     text: janela.depende([cfg.versao, Idioma.versao], cfg.estadoDaZWheel())
                 }
                 Opcao {
@@ -560,7 +571,7 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 visible: parent.estado === 3
                                 wrapMode: Text.Wrap
-                                color: "#e0a030"
+                                color: Tema.aviso
                                 text: janela.depende([abaDeControles.tique], cfg.falhaDaLiberacao())
                             }
                             TextField {
@@ -594,7 +605,7 @@ ApplicationWindow {
                         Label {
                             Layout.alignment: Qt.AlignHCenter
                             visible: janela.depende([abaDeControles.tique], cfg.calibracaoRecusada() && !cfg.calibrando())
-                            color: "#e0a030"
+                            color: Tema.aviso
                             text: janela.tr("controls.boomerang.calibrate_refused")
                         }
                         Dica {
@@ -839,7 +850,7 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             visible: motivo !== ""
                             wrapMode: Text.Wrap
-                            color: "#e0a030"
+                            color: Tema.aviso
                             text: motivo
                         }
                         Dica {
@@ -1008,7 +1019,7 @@ ApplicationWindow {
                         readonly property string motivo: janela.depende([cfg.versao, abaDeAtalhos.tique], cfg.recusa(true))
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
-                        color: "#e0a030"
+                        color: Tema.aviso
                         text: motivo
                     }
                     Dica {
@@ -1131,7 +1142,7 @@ ApplicationWindow {
                     Label {
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
-                        color: "#e0a030"
+                        color: Tema.aviso
                         text: janela.tr("graphics.aspect.hint")
                     }
                     Escolha {
