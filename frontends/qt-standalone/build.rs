@@ -29,7 +29,7 @@ fn interface_qt() {
             .qml_files(["qml/Principal.qml", "qml/Jogo.qml", "qml/GradeDaBiblioteca.qml", "qml/SliderDaBiblioteca.qml", "qml/JanelaDeConfiguracoes.qml", "qml/JanelaDeSaves.qml", "qml/JanelaDeLog.qml"])
             .depend("QtQuick"),
     )
-    .files(["src/qt/ponte.rs", "src/qt/biblioteca.rs", "src/qt/configuracoes.rs", "src/qt/auxiliares.rs"])
+    .files(["src/qt/ponte.rs", "src/qt/biblioteca.rs", "src/qt/configuracoes.rs", "src/qt/auxiliares.rs", "src/qt/tema.rs"])
     .include_dir("src/qt/cpp")
     .cpp_files([
         "src/qt/cpp/gl_qt.cpp",
@@ -37,6 +37,7 @@ fn interface_qt() {
         "src/qt/cpp/quadro.h",
         "src/qt/cpp/quadro.cpp",
         "src/qt/cpp/imagens.cpp",
+        "src/qt/cpp/paleta.cpp",
     ])
     // A imagem do aviso de calibração e a logo do ícone, em `qrc:/zeebx/`. O `assets/` é do
     // projeto, e não deste pacote.
@@ -52,4 +53,5 @@ fn interface_qt() {
     .build();
     println!("cargo:rerun-if-changed=src/qt/cpp/gl_qt.h");
     println!("cargo:rerun-if-changed=src/qt/cpp/imagens.h");
+    println!("cargo:rerun-if-changed=src/qt/cpp/paleta.h");
 }
