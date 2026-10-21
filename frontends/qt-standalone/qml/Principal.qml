@@ -588,11 +588,11 @@ ApplicationWindow {
 
             ItemDeMenu { icone: "settings"; text: tr("settings.tab.general"); onTriggered: configuracoes.abre(0) }
             ItemDeMenu { icone: "gamepad-2"; text: tr("settings.tab.controls"); onTriggered: configuracoes.abre(1) }
-            ItemDeMenu { text: tr("settings.tab.shortcuts"); onTriggered: configuracoes.abre(2) }
-            ItemDeMenu { text: tr("settings.tab.graphics"); onTriggered: configuracoes.abre(3) }
-            ItemDeMenu { icone: "fast-forward"; text: tr("settings.tab.speed"); onTriggered: configuracoes.abre(4) }
-            ItemDeMenu { text: tr("settings.tab.audio"); onTriggered: configuracoes.abre(5) }
-            ItemDeMenu { text: tr("settings.tab.debug"); onTriggered: configuracoes.abre(6) }
+            ItemDeMenu { icone: "keyboard"; text: tr("settings.tab.shortcuts"); onTriggered: configuracoes.abre(2) }
+            ItemDeMenu { icone: "monitor"; text: tr("settings.tab.graphics"); onTriggered: configuracoes.abre(3) }
+            ItemDeMenu { icone: "gauge"; text: tr("settings.tab.speed"); onTriggered: configuracoes.abre(4) }
+            ItemDeMenu { icone: "volume-2"; text: tr("settings.tab.audio"); onTriggered: configuracoes.abre(5) }
+            ItemDeMenu { icone: "bug"; text: tr("settings.tab.debug"); onTriggered: configuracoes.abre(6) }
             MenuSeparator {}
             ItemDeMenu {
                 text: tr("menu.settings.game")
