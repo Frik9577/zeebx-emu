@@ -51,6 +51,7 @@ Window {
     onVisibleChanged: if (visible) {
         tela.atualiza()
         simbolo.opacity = 0
+        pausado = false
     }
 
     // Mostra a janela no modo configurado para ela (`graphics.janela_do_jogo`).
@@ -73,6 +74,26 @@ Window {
 
     function alternaTelaCheia() {
         visibility = visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
+    }
+
+    // O que o teclado desta janela e o menu Sistema da principal pedem, pelo mesmo caminho: o
+    // símbolo no meio da tela aparece dos dois jeitos.
+    property alias tela: tela
+    // Se o jogo está parado pela pausa. O menu e a barra de ferramentas da principal leem.
+    property bool pausado: false
+
+    function pausa() {
+        pausado = tela.pausa()
+        simbolo.mostra(pausado ? "pausa" : "play", pausado)
+    }
+    function reinicia() {
+        if (tela.reinicia()) {
+            pausado = false
+            simbolo.mostra("reinicio", false)
+        }
+    }
+    function screenshot() {
+        tela.screenshot(Qt.formatDateTime(new Date(), "yyyy-MM-dd HH-mm-ss"))
     }
     onClosing: {
         filaDaGravacao.stop()
@@ -105,16 +126,15 @@ Window {
             } else if (tela.ehAtalhoDeScreenshot(evento.key)) {
                 // Segurar a tecla tira um screenshot, e não trinta.
                 if (!evento.isAutoRepeat)
-                    tela.screenshot(Qt.formatDateTime(new Date(), "yyyy-MM-dd HH-mm-ss"))
+                    janela.screenshot()
             } else if (tela.ehAtalhoDeReinicio(evento.key)) {
                 // Segurar não reinicia trinta vezes: o jogo recomeçaria a cada repetição.
-                if (!evento.isAutoRepeat && tela.reinicia())
-                    simbolo.mostra("reinicio", false)
+                if (!evento.isAutoRepeat)
+                    janela.reinicia()
             } else if (evento.key === Qt.Key_Escape) {
                 janela.close()
             } else if (evento.key === Qt.Key_P && !evento.isAutoRepeat) {
-                const pausado = tela.pausa()
-                simbolo.mostra(pausado ? "pausa" : "play", pausado)
+                janela.pausa()
             } else if (evento.key === Qt.Key_F11
                        || (evento.key === Qt.Key_Return && (evento.modifiers & Qt.AltModifier))) {
                 janela.alternaTelaCheia()
