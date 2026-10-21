@@ -286,6 +286,7 @@
   "saves.none": "Nenhum save encontrado.",
   "saves.title": "Gerenciador de saves",
   "settings.browse": "Escolher…",
+  "settings.description.empty": "Passe o ponteiro sobre uma opção, ou ande até ela com o Tab, para ver aqui o que ela faz.",
   "settings.discord": "Discord",
   "settings.discord.connected": "Conectado ao Discord.",
   "settings.discord.export_failed": "Não deu para exportar: {reason}",

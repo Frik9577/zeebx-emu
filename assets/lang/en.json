@@ -286,6 +286,7 @@
   "saves.none": "No saves found.",
   "saves.title": "Save manager",
   "settings.browse": "Choose…",
+  "settings.description.empty": "Hover over an option, or move to it with Tab, to see here what it does.",
   "settings.discord": "Discord",
   "settings.discord.connected": "Connected to Discord.",
   "settings.discord.export_failed": "Could not export: {reason}",

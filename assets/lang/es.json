@@ -286,6 +286,7 @@
   "saves.none": "No se encontraron partidas.",
   "saves.title": "Gestor de partidas",
   "settings.browse": "Elegir…",
+  "settings.description.empty": "Pasa el puntero sobre una opción, o llega a ella con Tab, para ver aquí lo que hace.",
   "settings.discord": "Discord",
   "settings.discord.connected": "Conectado a Discord.",
   "settings.discord.export_failed": "No se pudo exportar: {reason}",
