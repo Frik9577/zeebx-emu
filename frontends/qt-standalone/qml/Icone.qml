@@ -26,6 +26,7 @@ Text {
 
     // --- a tabela de nomes, escrita por ferramentas/icones.py ---
     readonly property var codigos: ({
+        "bug": 0xe20c,
         "calendar-clock": 0xe304,
         "camera": 0xe064,
         "circle-help": 0xe082,
@@ -36,13 +37,16 @@ Text {
         "folder-open": 0xe247,
         "gallery-horizontal": 0xe4ce,
         "gamepad-2": 0xe0df,
+        "gauge": 0xe1bf,
         "hard-drive": 0xe0ed,
         "info": 0xe0f9,
+        "keyboard": 0xe284,
         "layout-grid": 0xe0ff,
         "log-out": 0xe10e,
         "maximize": 0xe112,
         "message-circle": 0xe116,
         "minimize": 0xe11a,
+        "monitor": 0xe11d,
         "pause": 0xe12e,
         "play": 0xe13c,
         "refresh-cw": 0xe145,
@@ -53,6 +57,7 @@ Text {
         "settings": 0xe154,
         "square": 0xe167,
         "undo-2": 0xe2a1,
+        "volume-2": 0xe1ab,
         "x": 0xe1b2,
     })
     // --- fim da tabela ---
