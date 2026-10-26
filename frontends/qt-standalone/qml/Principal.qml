@@ -60,8 +60,19 @@ ApplicationWindow {
     // A janela perdeu o foco com o jogo nela: nenhuma tecla continua apertada.
     onActiveChanged: if (!active && jogandoNaPrincipal) palcoDaPrincipal.tela.solta()
 
-    // Fechar a biblioteca encerra tudo, com ou sem jogo aberto — como no egui.
-    onClosing: {
+    // Fechar a biblioteca encerra tudo, com ou sem jogo aberto — como no egui. Com um jogo aberto,
+    // pergunta antes, onde o jogo está. Ver `graphics.confirmar_ao_fechar`.
+    property bool saidaConfirmada: false
+    onClosing: (close) => {
+        if (jogando && !saidaConfirmada && palco.tela.confirmaAoFechar()) {
+            close.accepted = false
+            if (jogo.visible) {
+                jogo.raise()
+                jogo.requestActivate()
+            }
+            palco.pedeParaSair()
+            return
+        }
         filaDaGravacao.stop()
         principal.guardaTamanho()
         Qt.quit()
@@ -141,10 +152,21 @@ ApplicationWindow {
         requestActivate()
     }
 
-    // Fecha o jogo de onde ele estiver. Na principal, a biblioteca volta, com a janela como era.
+    // O Fechar do menu e da barra: a pergunta aparece onde o jogo está, e a janela separada vem
+    // para a frente para mostrá-la.
+    function pedeParaFecharOJogo() {
+        if (jogo.visible) {
+            jogo.raise()
+            jogo.requestActivate()
+        }
+        palco.pedeParaFechar()
+    }
+
+    // Fecha o jogo de onde ele estiver, sem perguntar: quem pergunta é o `palco.pedeParaFechar()`,
+    // que chama isto depois. Na principal, a biblioteca volta, com a janela como era.
     function fechaJogo() {
         if (jogo.visible) {
-            jogo.close()
+            jogo.fecha()
             return
         }
         if (!jogandoNaPrincipal)
@@ -207,6 +229,16 @@ ApplicationWindow {
         id: jogo
 
         transientParent: null
+    }
+    Connections {
+        target: jogo.palco
+        function onSaidaPedida() { principal.sai() }
+    }
+
+    // Sair do Zeebx depois da pergunta, ou sem ela.
+    function sai() {
+        saidaConfirmada = true
+        close()
     }
 
     JanelaDeConfiguracoes {
@@ -458,15 +490,19 @@ ApplicationWindow {
 
             title: tr("menu.file")
 
+            // A Z-Wheel e a procura são da biblioteca: com o jogo no lugar dela, ficam desabilitadas.
+            // Abrir a Z-Wheel trocaria o jogo por ela sem pergunta nenhuma.
             ItemDeMenu {
-                icone: "disc-3"
+                icone: "house"
                 text: tr("menu.file.z_wheel")
-                enabled: principal.depende([configuracoes.cfg.versao], biblioteca.temZWheel())
+                enabled: !principal.jogandoNaPrincipal
+                         && principal.depende([configuracoes.cfg.versao], biblioteca.temZWheel())
                 onTriggered: principal.mostra(biblioteca.abreZWheel())
             }
             ItemDeMenu {
                 icone: "refresh-cw"
                 text: tr("menu.file.rescan")
+                enabled: !principal.jogandoNaPrincipal
                 onTriggered: {
                     biblioteca.procuraDeNovo()
                     principal.recomeca()
@@ -576,7 +612,7 @@ ApplicationWindow {
                 text: tr("menu.system.close")
                 atalho: "Esc"
                 enabled: principal.jogando
-                onTriggered: principal.fechaJogo()
+                onTriggered: principal.pedeParaFecharOJogo()
             }
         }
 
@@ -727,15 +763,19 @@ ApplicationWindow {
             BotaoDeFerramenta {
                 id: botaoZWheel
 
-                icone: "disc-3"
+                icone: "house"
                 text: tr("nav.z_wheel")
-                dica: tr(enabled ? "nav.z_wheel.hint" : "nav.z_wheel.missing")
-                enabled: principal.depende([configuracoes.cfg.versao], biblioteca.temZWheel())
+                dica: tr(principal.jogandoNaPrincipal ? "nav.z_wheel.playing"
+                         : enabled ? "nav.z_wheel.hint" : "nav.z_wheel.missing")
+                // Como no menu Arquivo: com o jogo na principal, a Z-Wheel e a procura esperam.
+                enabled: !principal.jogandoNaPrincipal
+                         && principal.depende([configuracoes.cfg.versao], biblioteca.temZWheel())
                 onClicked: principal.mostra(biblioteca.abreZWheel())
             }
             BotaoDeFerramenta {
                 icone: "refresh-cw"
                 text: tr("library.rescan")
+                enabled: !principal.jogandoNaPrincipal
                 onClicked: {
                     biblioteca.procuraDeNovo()
                     principal.recomeca()
@@ -758,7 +798,7 @@ ApplicationWindow {
                 icone: "square"
                 text: tr("toolbar.close")
                 enabled: principal.jogando
-                onClicked: principal.fechaJogo()
+                onClicked: principal.pedeParaFecharOJogo()
             }
             Separador {}
             BotaoDeFerramenta {
@@ -863,9 +903,14 @@ ApplicationWindow {
 
     // A barra de status: a contagem e o que apertar à esquerda; com um jogo aberto, à direita,
     // o nome dele, onde ele desenha, e a velocidade da última amostra, como no PCSX2.
+    //
+    // **Some enquanto o jogo roda na principal**, e o jogo desce até o pé da janela: a contagem e
+    // a dica são da biblioteca, e a velocidade e onde o jogo desenha estão na caixa de métricas
+    // do canto, que se liga em Depuração. Com a janela separada a biblioteca continua à vista, e a
+    // barra também, com o jogo à direita.
     footer: ToolBar {
         position: ToolBar.Footer
-        visible: principal.comStatus && !principal.soOJogo
+        visible: principal.comStatus && !principal.soOJogo && !principal.jogandoNaPrincipal
 
         RowLayout {
             anchors.fill: parent
@@ -896,8 +941,8 @@ ApplicationWindow {
         anchors.fill: parent
         visible: principal.jogandoNaPrincipal
         ativo: principal.jogandoNaPrincipal
-        faixaDeEstado: false
         onFechaPedido: principal.fechaJogo()
+        onSaidaPedida: principal.sai()
         onTelaCheiaPedida: principal.alternaTelaCheia()
     }
 
@@ -1050,9 +1095,16 @@ ApplicationWindow {
                     }
                 }
 
+                // A classificação é uma faixa larga (a idade, o tema e o conteúdo, lado a lado). Sem
+                // largura dada, a imagem ficava com a do arquivo e passava da borda do diálogo, por
+                // cima da janela principal. Agora cabe na coluna, e a altura segue a proporção.
                 Image {
-                    height: Math.min(64, sourceSize.height)
+                    width: parent.width
+                    height: sourceSize.width > 0
+                            ? Math.min(64, sourceSize.height, width * sourceSize.height / sourceSize.width)
+                            : 0
                     fillMode: Image.PreserveAspectFit
+                    horizontalAlignment: Image.AlignLeft
                     source: detalhes.campo("classificacao")
                     visible: source !== ""
                 }
