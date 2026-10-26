@@ -35,7 +35,6 @@ ICONES = [
     "calendar-clock",  # liberar a sincronização do Zeeboids
     "camera",  # screenshot
     "circle-help",
-    "disc-3",  # a Z-Wheel
     "download",  # procurar atualização
     "external-link",  # o site
     "fast-forward",
@@ -44,6 +43,7 @@ ICONES = [
     "gamepad-2",  # controles
     "gauge",  # velocidade
     "hard-drive",  # o gerenciador de saves
+    "house",  # a Z-Wheel, a tela inicial do console
     "info",  # sobre
     "keyboard",  # atalhos
     "layout-grid",  # a biblioteca em grade
