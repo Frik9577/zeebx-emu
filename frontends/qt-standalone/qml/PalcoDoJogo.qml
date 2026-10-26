@@ -1,4 +1,6 @@
 import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
 import QtQuick.Shapes
 
 import zeebx
@@ -28,16 +30,20 @@ Item {
     }
 
     // Se o jogo está neste palco: só o ativo anda a cada quadro.
+    //
+    // **Não há linha de estado embaixo do quadro.** A janela separada tinha uma, de 24 px, com o
+    // título e onde o jogo desenha, e ela não saía por opção nenhuma. O título está no da janela,
+    // e onde o jogo desenha está na caixa de métricas, que se liga em Depuração.
     property bool ativo: false
-    // A linha de estado embaixo do quadro, na janela separada. Na principal, a barra de status.
-    property bool faixaDeEstado: true
-    readonly property int faixa: faixaDeEstado ? 24 : 0
     // Se o jogo está parado pela pausa. O menu e a barra de ferramentas da principal leem.
     property bool pausado: false
     property alias tela: tela
 
-    // Esc, ou o jogo que saiu sozinho sem Z-Wheel para onde voltar.
+    // O jogo deve fechar agora: confirmado na pergunta, sem pergunta a fazer, ou o jogo saiu
+    // sozinho sem Z-Wheel para onde voltar.
     signal fechaPedido()
+    // Sair do Zeebx, confirmado na pergunta. Ver `pedeParaSair`.
+    signal saidaPedida()
     // F11, ou Alt+Enter.
     signal telaCheiaPedida()
 
@@ -54,6 +60,22 @@ Item {
     // Fecha o jogo de vez: a partida sai do núcleo.
     function fecha() {
         tela.fecha()
+    }
+
+    // O Esc, o Fechar do menu e da barra e o fechar da janela passam por aqui: com a opção
+    // ligada, o jogo pausa e pergunta antes. Ver `graphics.confirmar_ao_fechar`.
+    function pedeParaFechar() {
+        if (tela.confirmaAoFechar())
+            confirmacao.abre(false)
+        else
+            fechaPedido()
+    }
+    // O mesmo, para sair do Zeebx com o jogo aberto.
+    function pedeParaSair() {
+        if (tela.confirmaAoFechar())
+            confirmacao.abre(true)
+        else
+            saidaPedida()
     }
 
     // O que o teclado e o menu Sistema pedem, pelo mesmo caminho: o símbolo no meio da tela
@@ -84,7 +106,7 @@ Item {
         anchors.fill: parent
         // O painel de depuração é uma faixa, e não uma sobreposição: reservar espaço encolhe o
         // quadro do jogo em vez de tapá-lo, como no egui.
-        anchors.bottomMargin: palco.faixa + (painel.visible ? painel.height : 0)
+        anchors.bottomMargin: painel.visible ? painel.height : 0
         focus: true
 
         // Esc fecha e P pausa, como na janela do egui. Nenhuma das duas colide com o controle do
@@ -108,7 +130,9 @@ Item {
                 if (!evento.isAutoRepeat)
                     palco.reinicia()
             } else if (evento.key === Qt.Key_Escape) {
-                palco.fechaPedido()
+                // Segurado, o Esc repetido fecharia a pergunta que ele mesmo abriu.
+                if (!evento.isAutoRepeat)
+                    palco.pedeParaFechar()
             } else if (evento.key === Qt.Key_P && !evento.isAutoRepeat) {
                 palco.pausa()
             } else if (evento.key === Qt.Key_F11
@@ -356,14 +380,60 @@ Item {
         }
     }
 
-    // O aviso do screenshot, no canto de cima, por dois segundos. É o Qt que o desenha por cima
-    // do quadro, e por isso ele não entra no PNG, que vem do núcleo. Clicar abre a pasta do jogo.
+    // As métricas, no canto de cima à direita, com a opção de Depuração: os quadros por segundo
+    // em destaque, a velocidade e onde o jogo desenha. Por cima do quadro, como os outros avisos,
+    // e não uma faixa: o painel de baixo encolhe o jogo, e isto é para deixar ligado jogando.
     Rectangle {
-        id: avisoDoScreenshot
+        id: metricas
 
         anchors.right: tela.right
         anchors.top: tela.top
         anchors.margins: 16
+        width: Math.min(linhasDasMetricas.implicitWidth + 24, tela.width / 2)
+        height: linhasDasMetricas.implicitHeight + 16
+        visible: tela.metricas.length > 0
+        radius: 6
+        color: "#c0202020"
+        border.color: "#505050"
+
+        // Um layout, e não uma `Column`: a largura natural dele é a do texto mais largo, e não a
+        // que ele recebeu, então a caixa pode depender dela sem fechar um laço.
+        ColumnLayout {
+            id: linhasDasMetricas
+
+            anchors.centerIn: parent
+            width: parent.width - 24
+            spacing: 2
+
+            Repeater {
+                model: tela.metricas
+
+                Text {
+                    required property int index
+                    required property string modelData
+
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignRight
+                    elide: Text.ElideRight
+                    color: index === 0 ? "white" : "#d0d0d0"
+                    font.bold: index === 0
+                    font.pixelSize: index === 0 ? 18 : 12
+                    text: modelData
+                }
+            }
+        }
+    }
+
+    // O aviso do screenshot, no canto de cima, por dois segundos. É o Qt que o desenha por cima
+    // do quadro, e por isso ele não entra no PNG, que vem do núcleo. Clicar abre a pasta do jogo.
+    // Embaixo das métricas, quando elas estão à mostra.
+    Rectangle {
+        id: avisoDoScreenshot
+
+        anchors.right: tela.right
+        anchors.top: metricas.visible ? metricas.bottom : tela.top
+        anchors.topMargin: metricas.visible ? 8 : 16
+        anchors.rightMargin: 16
         width: textoDoScreenshot.implicitWidth + 24
         height: textoDoScreenshot.implicitHeight + 16
         visible: false
@@ -407,8 +477,9 @@ Item {
         id: avisoDoEstado
 
         anchors.right: tela.right
-        anchors.top: avisoDoScreenshot.visible ? avisoDoScreenshot.bottom : tela.top
-        anchors.topMargin: avisoDoScreenshot.visible ? 8 : 16
+        anchors.top: avisoDoScreenshot.visible ? avisoDoScreenshot.bottom
+                     : metricas.visible ? metricas.bottom : tela.top
+        anchors.topMargin: avisoDoScreenshot.visible || metricas.visible ? 8 : 16
         anchors.rightMargin: 16
         width: textoDoEstado.implicitWidth + 24
         height: textoDoEstado.implicitHeight + 16
@@ -448,7 +519,6 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: palco.faixa
         height: 48
         visible: tela.depuracao !== ""
         color: "#1c1c1c"
@@ -518,7 +588,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: palco.faixa + (painel.visible ? painel.height : 0)
+        anchors.bottomMargin: painel.visible ? painel.height : 0
         height: faixa.implicitHeight + 12
         visible: tela.parou !== ""
         color: "#c8000000"
@@ -546,15 +616,64 @@ Item {
         }
     }
 
-    // A linha de estado da janela separada: o título do jogo e onde ele desenha. Na principal
-    // quem diz isso é a barra de status, e a faixa não existe.
-    Text {
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.margins: 4
-        visible: palco.faixaDeEstado
-        color: "#bbbbbb"
-        text: tela.estado
+    // A pergunta antes de fechar o jogo, ou de sair do Zeebx com ele aberto. Mora no palco, e não na
+    // janela principal, para aparecer onde o jogo está: na janela separada, um diálogo da principal
+    // abriria atrás dela. O jogo fica pausado enquanto ela está aberta, e desistir o devolve como
+    // estava.
+    Dialog {
+        id: confirmacao
+
+        // Se a pergunta é a de sair do Zeebx, e não só a de fechar o jogo.
+        property bool saindo: false
+        // Se foi a pergunta que pausou o jogo: um jogo que já estava pausado continua assim.
+        property bool pausouOJogo: false
+        property bool confirmada: false
+
+        function abre(sair) {
+            saindo = sair
+            confirmada = false
+            pausouOJogo = !palco.pausado
+            if (pausouOJogo)
+                palco.pausa()
+            open()
+        }
+
+        anchors.centerIn: parent
+        width: Math.min(420, palco.width - 32)
+        modal: true
+        title: palco.tr(saindo ? "play.confirm_quit.title" : "play.confirm_close.title")
+
+        Label {
+            width: parent.width
+            wrapMode: Text.Wrap
+            text: palco.tr(confirmacao.saindo ? "play.confirm_quit.text" : "play.confirm_close.text")
+        }
+
+        footer: DialogButtonBox {
+            Button {
+                text: palco.tr("play.confirm.cancel")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                text: palco.tr(confirmacao.saindo ? "play.confirm_quit.ok" : "play.confirm_close.ok")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+
+        onAccepted: confirmada = true
+        // Pelo `closed`, e não pelo `rejected`: o Esc e o clique fora fecham sem passar por ele.
+        onClosed: {
+            if (confirmada) {
+                if (saindo)
+                    palco.saidaPedida()
+                else
+                    palco.fechaPedido()
+                return
+            }
+            if (pausouOJogo && palco.pausado)
+                palco.pausa()
+            palco.foca()
+        }
     }
 
     // Um passo por quadro da janela, no ritmo do vsync — como o `request_repaint` do egui. Um
