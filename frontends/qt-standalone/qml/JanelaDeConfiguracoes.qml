@@ -639,20 +639,47 @@ ApplicationWindow {
                                 enabled: controles.ligada
                                 text: janela.tr("controls.kind")
                             }
+                            // O Z-Pad e o Dragon são um botão só: os botões, os eixos e o desenho são os
+                            // mesmos. O modelo vai na caixa ao lado, porque o console vê o identificador
+                            // USB de cada um, e os jogos da Boomerang Sports mudam o tratamento por ele.
+                            // Os índices continuam os do `cfg.aparelho()`: 0 Z-Pad, 1 Dragon,
+                            // 2 Boomerang, 3 teclado.
                             Repeater {
-                                model: ["controls.kind.zpad", "controls.kind.dragon",
-                                        "controls.kind.boomerang", "controls.kind.keyboard"]
+                                model: [["controls.kind.pad", 1], ["controls.kind.boomerang", 2],
+                                        ["controls.kind.keyboard", 3]]
 
                                 Button {
-                                    required property int index
-                                    required property string modelData
+                                    required property var modelData
+                                    readonly property bool ehControle: modelData[1] === 1
                                     focusPolicy: Qt.NoFocus
                                     enabled: controles.ligada
                                     checkable: true
-                                    checked: controles.aparelho === index
-                                    text: janela.tr(modelData)
-                                    onClicked: cfg.defineAparelho(index)
+                                    // Como botões de rádio: clicar no Controle já escolhido não o
+                                    // desmarca. Sem isto o clique alternava o `checked`, e como o
+                                    // aparelho não mudava, a ligação não voltava a marcá-lo.
+                                    autoExclusive: true
+                                    checked: ehControle ? controles.aparelho <= 1
+                                                        : controles.aparelho === modelData[1]
+                                    text: janela.tr(modelData[0])
+                                    // Já num controle, o clique não troca o modelo escolhido. Vindo de
+                                    // outro aparelho, é o Dragon, que é o padrão do emulador.
+                                    onClicked: cfg.defineAparelho(ehControle && controles.aparelho <= 1
+                                                                  ? controles.aparelho : modelData[1])
                                 }
+                            }
+                            Label {
+                                visible: controles.aparelho <= 1
+                                enabled: controles.ligada
+                                Layout.leftMargin: 8
+                                text: janela.tr("controls.kind.model")
+                            }
+                            ComboBox {
+                                visible: controles.aparelho <= 1
+                                enabled: controles.ligada
+                                focusPolicy: Qt.NoFocus
+                                model: [janela.tr("controls.kind.zpad"), janela.tr("controls.kind.dragon")]
+                                currentIndex: controles.aparelho
+                                onActivated: (indice) => cfg.defineAparelho(indice)
                             }
                         }
                         Dica {
@@ -1239,6 +1266,13 @@ ApplicationWindow {
                         rotulo: "graphics.separate_window"
                         dica: "graphics.separate_window.hint"
                     }
+                    // Como o "Confirm Shutdown" do PCSX2. Global, como a janela: não muda por jogo.
+                    Opcao {
+                        visible: !janela.doJogo
+                        chave: "graphics.confirmar_ao_fechar"
+                        rotulo: "graphics.confirm_close"
+                        dica: "graphics.confirm_close.hint"
+                    }
 
                     Titulo { text: janela.tr("graphics.scaling") }
                     Repeater {
@@ -1475,6 +1509,12 @@ ApplicationWindow {
                         Opcao { chave: "debug.clock"; rotulo: "debug.clock" }
                         Opcao { chave: "debug.memory"; rotulo: "debug.memory" }
                         Opcao { chave: "debug.timeline"; rotulo: "debug.timeline" }
+                    }
+                    Opcao {
+                        Layout.topMargin: 8
+                        chave: "debug.metricas"
+                        rotulo: "debug.metricas"
+                        dica: "debug.metricas.hint"
                     }
                     Opcao {
                         Layout.topMargin: 8
