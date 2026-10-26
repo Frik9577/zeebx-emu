@@ -84,6 +84,9 @@ pub struct Volta {
     pub indicadores: String,
     /// A velocidade e os quadros por segundo da última amostra, para a barra de status.
     pub ritmo: Option<(u32, u32)>,
+    /// As linhas da caixa de métricas do canto, a primeira com os quadros por segundo; vazio com
+    /// a opção desligada. Ver [`Nucleo::metricas`].
+    pub metricas: Vec<String>,
 }
 
 /// O que dizer de um screenshot que terminou, já traduzido.
@@ -821,6 +824,16 @@ impl Nucleo {
         Some((textos, historia))
     }
 
+    /// Se fechar o jogo aberto pede confirmação. A Z-Wheel fecha sem perguntar: ela é a tela
+    /// inicial, e não guarda nada que se perca.
+    pub fn confirma_ao_fechar(&self) -> bool {
+        self.settings.graphics.confirmar_ao_fechar
+            && self
+                .partida
+                .as_ref()
+                .is_some_and(|partida| partida.sessao().classe() != Z_WHEEL)
+    }
+
     pub fn alterna_pausa(&mut self) {
         if let Some(partida) = self.partida.as_mut() {
             partida.alterna_pausa();
@@ -1214,7 +1227,31 @@ impl Nucleo {
             let amostra = p.sessao().sample();
             (amostra.speed, amostra.fps)
         });
+        volta.metricas = self.metricas();
         volta
+    }
+
+    /// A caixa de métricas do canto, quando ligada: os quadros por segundo, a velocidade e onde o
+    /// jogo desenha — este último saiu do pé da janela com a barra de status, que some enquanto o
+    /// jogo roda na principal, e com a faixa da janela separada.
+    fn metricas(&self) -> Vec<String> {
+        let Some(partida) = self.partida.as_ref().filter(|_| self.settings.debug.metricas) else {
+            return Vec::new();
+        };
+        let amostra = partida.sessao().sample();
+        let graficos = &self.valendo().graphics;
+        let onde = match (&self.placa, graficos.gpu_rasterizer) {
+            (Some(placa), true) => self.catalogo.format(
+                "debug.metricas.gpu",
+                &[("scale", &graficos.resolucao_interna.to_string()), ("name", placa)],
+            ),
+            _ => self.catalogo.get("debug.metricas.software").to_string(),
+        };
+        vec![
+            self.catalogo.format("debug.metricas.fps", &[("fps", &amostra.fps.to_string())]),
+            self.catalogo.format("debug.metricas.speed", &[("percent", &amostra.speed.to_string())]),
+            onde,
+        ]
     }
 
     /// O que vai por cima do jogo: o "▶▶ 3x" de enquanto ele avança e o "Turbo" de um turbo de
