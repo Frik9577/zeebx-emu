@@ -39,6 +39,7 @@ função não está aqui.
 | [27-moldura-da-janela.md](27-moldura-da-janela.md) | A barra de menus, a de ferramentas com os ícones da Lucide e a de status em volta da biblioteca |
 | [28-jogo-na-janela-principal.md](28-jogo-na-janela-principal.md) | O jogo no lugar da biblioteca, a janela separada como opção, e um palco para cada uma |
 | [29-configuracoes-com-barra-lateral.md](29-configuracoes-com-barra-lateral.md) | As categorias numa coluna com ícones, e a explicação de cada opção no rodapé |
+| [30-ajustes-da-repaginada.md](30-ajustes-da-repaginada.md) | A casa da Z-Wheel, o jogo até o pé da janela com as métricas no canto, o Z-Pad e o Dragon num botão, e a pergunta antes de fechar o jogo |
 
 ## Como medir
 
