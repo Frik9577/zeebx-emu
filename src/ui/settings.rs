@@ -84,6 +84,9 @@ pub struct DebugView {
     pub memory: bool,
     /// O gráfico com a história recente.
     pub timeline: bool,
+    /// A caixa do canto de cima à direita, por cima do jogo: quadros por segundo, velocidade e
+    /// onde o jogo desenha. Não depende do painel, que é uma faixa embaixo e encolhe o jogo.
+    pub metricas: bool,
     /// A janela separada com o log da execução.
     pub log: bool,
     /// Grava cada execução num arquivo próprio, com carimbo de hora em cada linha. Ver
@@ -106,6 +109,7 @@ impl Default for DebugView {
             clock: true,
             memory: true,
             timeline: true,
+            metricas: false,
             log: false,
             gravar_sessao: false,
             nivel_de_log: "aviso".to_string(),
@@ -125,6 +129,10 @@ pub struct Graphics {
     /// biblioteca. O "Render to Separate Window" do PCSX2. Vale no próximo jogo aberto: um jogo
     /// rodando não troca de janela.
     pub jogo_separado: bool,
+    /// Perguntar antes de fechar o jogo — pelo Esc, pelo menu, pela barra ou pelo fechar da
+    /// janela —, como o "Confirm Shutdown" do PCSX2. Um Esc a mais não joga fora o que não foi
+    /// salvo. A Z-Wheel e o jogo que sai sozinho fecham sem perguntar.
+    pub confirmar_ao_fechar: bool,
     /// O tamanho em que a janela principal estava quando foi fechada, em pontos.
     ///
     /// `None` é o padrão de fábrica (960×720). Só vale em modo janela: maximizada ou em tela
@@ -229,6 +237,7 @@ impl Default for Graphics {
             janela: ModoDaJanela::Maximizada,
             janela_do_jogo: ModoDaJanela::Maximizada,
             jogo_separado: false,
+            confirmar_ao_fechar: true,
             tamanho_da_janela: None,
             tamanho_da_janela_do_jogo: None,
             scaling: Scaling::default(),
@@ -764,6 +773,7 @@ impl ConfigDoJogo {
                 janela: janela.janela,
                 janela_do_jogo: janela.janela_do_jogo,
                 jogo_separado: janela.jogo_separado,
+                confirmar_ao_fechar: janela.confirmar_ao_fechar,
                 tamanho_da_janela: janela.tamanho_da_janela,
                 tamanho_da_janela_do_jogo: janela.tamanho_da_janela_do_jogo,
                 gpu_present: janela.gpu_present,
@@ -1043,6 +1053,7 @@ mod tests {
             },
             debug: DebugView {
                 overlay: true,
+                metricas: true,
                 ..DebugView::default()
             },
             audio: Audio {
