@@ -97,7 +97,8 @@ aberto, à direita, o nome dele, onde ele desenha (a placa ou o processador) e a
 última amostra, a mesma do painel de depuração: "Double Dragon — software · 100% · 60 FPS".
 
 As duas barras se escondem pelo menu Exibir, e a escolha fica gravada (`barras` no
-`settings.json`).
+`settings.json`). Depois das fases, a de status passou a sumir enquanto o jogo roda na principal, e
+o que ela dizia dele foi para a caixa de métricas do canto ([30](30-ajustes-da-repaginada.md)).
 
 ## Como se conferiu
 
