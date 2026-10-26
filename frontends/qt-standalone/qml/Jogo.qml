@@ -51,15 +51,29 @@ Window {
             showMaximized()
         else
             showNormal()
+        liberada = false
         raise()
         requestActivate()
+    }
+
+    // Fechar pela janela pergunta antes, como o Esc. Depois da pergunta, ou de um jogo que saiu
+    // sozinho, `fecha()` fecha de vez.
+    property bool liberada: false
+    function fecha() {
+        liberada = true
+        close()
     }
 
     function alternaTelaCheia() {
         visibility = visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
     }
 
-    onClosing: {
+    onClosing: (close) => {
+        if (!liberada && palcoDaJanela.tela.confirmaAoFechar()) {
+            close.accepted = false
+            palcoDaJanela.pedeParaFechar()
+            return
+        }
         filaDaGravacao.stop()
         janela.guardaTamanho()
         palcoDaJanela.fecha()
@@ -71,7 +85,7 @@ Window {
 
         anchors.fill: parent
         ativo: janela.visible
-        onFechaPedido: janela.close()
+        onFechaPedido: janela.fecha()
         onTelaCheiaPedida: janela.alternaTelaCheia()
     }
 }
