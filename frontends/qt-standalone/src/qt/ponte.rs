@@ -63,6 +63,7 @@ pub mod qobject {
         #[qproperty(i32, estado_serie, cxx_name = "estadoSerie")]
         #[qproperty(QString, velocidade)]
         #[qproperty(QString, indicadores)]
+        #[qproperty(QStringList, metricas)]
         type TelaDoJogo = super::TelaDoJogoRust;
 
         /// Uma volta: entrada, emulação e, se a tela mudou, um quadro novo.
@@ -161,6 +162,11 @@ pub mod qobject {
         #[cxx_name = "modoDaJanela"]
         fn modo_da_janela(self: &Self) -> i32;
 
+        /// Se fechar o jogo aberto pede confirmação. Ver `graphics.confirmar_ao_fechar`.
+        #[qinvokable]
+        #[cxx_name = "confirmaAoFechar"]
+        fn confirma_ao_fechar(self: &Self) -> bool;
+
         /// A largura em que a janela do jogo estava quando foi fechada, em pontos, ou zero
         /// sem tamanho guardado. Ver `graphics.tamanho_da_janela_do_jogo`.
         #[qinvokable]
@@ -252,6 +258,8 @@ pub struct TelaDoJogoRust {
     velocidade: QString,
     /// O "▶▶ 3x" do fast-forward e o "Turbo"; vazio esconde.
     indicadores: QString,
+    /// As linhas da caixa de métricas do canto; vazia esconde.
+    metricas: QStringList,
     /// A tela que foi para o `ItemDoQuadro` como imagem: série e escritas. Igual, não há o que
     /// subir. `None` quando o que está lá é a textura da placa, ou nada.
     chave: Option<(u64, u64)>,
@@ -400,6 +408,13 @@ impl qobject::TelaDoJogo {
         let indicadores = QString::from(&volta.indicadores);
         if self.indicadores() != &indicadores {
             self.as_mut().set_indicadores(indicadores);
+        }
+        let mut metricas = QStringList::default();
+        for linha in &volta.metricas {
+            metricas.append(QString::from(linha));
+        }
+        if self.metricas() != &metricas {
+            self.as_mut().set_metricas(metricas);
         }
         let parou = QString::from(&volta.parou);
         if self.parou() != &parou {
@@ -558,6 +573,10 @@ impl qobject::TelaDoJogo {
 
     pub fn modo_da_janela(&self) -> i32 {
         nucleo::com(|nucleo| modo(nucleo.settings.graphics.janela_do_jogo))
+    }
+
+    pub fn confirma_ao_fechar(&self) -> bool {
+        nucleo::com(|nucleo| nucleo.confirma_ao_fechar())
     }
 
     pub fn largura_da_janela(&self) -> f64 {
