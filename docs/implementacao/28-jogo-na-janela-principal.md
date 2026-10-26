@@ -40,7 +40,9 @@ na sua janela, e o que fica parado não desenha.
 - **Em tela cheia, as três barras saem**, como no PCSX2: a tela é do jogo. O F11 e o Alt+Enter
   alternam.
 - **A linha de estado embaixo do quadro não existe**: quem diz o título e onde o jogo desenha é a
-  barra de status. O título da janela vira "Zeebx — Double Dragon — software".
+  barra de status. O título da janela vira "Zeebx — Double Dragon — software". Depois, a barra de
+  status passou a sumir durante o jogo, e a linha saiu também da janela separada
+  ([30](30-ajustes-da-repaginada.md)).
 - **O log da execução** fica por cima da janela onde o jogo está.
 - Perder o foco solta as teclas, como na janela separada.
 
