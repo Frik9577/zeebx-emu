@@ -17,6 +17,20 @@ aplicativo pede 444 MHz no ARM e 222 no barramento; o que o aparelho aceitou fic
 velocidade neste aparelho não foi medida. O processador aqui é o interpretador: o dynarmic não
 emite ARMv7. A música usa a tabela de timbres.
 
+## O que ainda não foi medido no aparelho
+
+Vale para este aplicativo e para o core do RetroArch, que usam o mesmo núcleo.
+
+- **A memória do jogo.** Na Vita o heap do jogo é de 48 MiB, e não de 64 como no desktop: com 64
+  o vitaGL não achava o bloco temporário do quadro. A região que o emulador reserva para si
+  (`INTERNAL_BASE`, em `src/loader/mod.rs`) soma mais 16 MiB, e aqui a newlib reserva o bloco
+  inteiro, sem o overcommit do desktop. Ninguém mediu ainda se 48 + 16 deixam o quadro caber,
+  nem se o Quake roda com 48. Se um jogo fechar sem aviso ou disser que ficou sem
+  memória, este é o primeiro suspeito.
+- **Save state entre plataformas não vale.** Com o heap de outro tamanho, um estado gravado no
+  desktop, no Android ou no core de outra plataforma é recusado aqui, e o daqui é recusado lá.
+  O emulador diz que a região não bate e o jogo segue como estava; nada é corrompido.
+
 ## Onde ficam os jogos
 
 `ux0:data/zeebx/roms`, no VitaShell. Um `.zip` ou um `.mod` servem, na mesma varredura do desktop.

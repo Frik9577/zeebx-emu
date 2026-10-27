@@ -118,6 +118,12 @@ O aplicativo, que não passa pelo RetroArch, mora em
 mesma imagem Docker, outro binário. O `vita.yml` é `workflow_dispatch`, como o APK; a release
 publica `zeebx-vita.zip`.
 
+**A memória na Vita é apertada e não foi medida no aparelho.** O heap do jogo lá é de 48 MiB
+(64 no resto), e a região interna soma mais 16 MiB que a newlib reserva de verdade. Uma região
+nova ou maior em `loader/mod.rs` sai dessa mesma conta. O heap de outro tamanho também faz o
+save state da Vita não abrir nas outras plataformas, e vice-versa. Ver
+[`frontends/vita-standalone/LEIAME.md`](frontends/vita-standalone/LEIAME.md).
+
 **iOS** precisa de um Mac com Xcode e dos alvos `aarch64-apple-ios` e
 `aarch64-apple-ios-sim` no rustup. O passo a passo está em
 [`frontends/ios/LEIAME.md`](frontends/ios/LEIAME.md):
