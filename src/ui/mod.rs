@@ -43,6 +43,8 @@ pub mod saves;
 // ganhar o botão sem reescrever nada.
 pub mod screenshot;
 pub mod settings;
+// Sem gate: um tema é um JSON de cores, e quem as aplica é a janela de cada frontend.
+pub mod temas;
 
 #[cfg(feature = "desktop")]
 pub mod atualizacao;

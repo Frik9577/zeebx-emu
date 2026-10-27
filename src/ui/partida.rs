@@ -223,6 +223,8 @@ pub struct Partida {
     diario: Option<Diario>,
     /// O atalho do fast-forward, que se segura ou se alterna. Ver [`Partida::le_o_avanco`].
     avanco: Interruptor,
+    /// O fast-forward ligado pelo menu, à parte do atalho. Ver [`Partida::alterna_o_avanco_fixo`].
+    avanco_fixo: bool,
     /// Se o fast-forward valeu na última volta.
     avancando: bool,
     /// O turbo de cada porta: o estado do modo de alternar. Ver [`crate::velocidade::turbo`].
@@ -348,6 +350,7 @@ impl Partida {
             pausada: false,
             aberta_pela_z_wheel: false,
             avanco: Interruptor::default(),
+            avanco_fixo: false,
             avancando: false,
             turbos: Default::default(),
             rewind: ControleDoRewind::default(),
@@ -484,6 +487,7 @@ impl Partida {
         self.teclas_pendentes.clear();
         self.define_pausa(false);
         self.avanco.desliga();
+        self.avanco_fixo = false;
         self.avancando = false;
         for turbo in &mut self.turbos {
             turbo.desliga();
@@ -614,9 +618,24 @@ impl Partida {
     /// Lê o atalho do fast-forward desta volta e diz se ele vale. Pausado, não vale: a pausa é
     /// pausa, e o alternar ligado fica esperando a volta do jogo.
     pub fn le_o_avanco(&mut self, apertado: bool, modo: ModoDoAtalho) -> bool {
-        let ligado = self.avanco.atualiza(apertado, modo);
+        let ligado = self.avanco.atualiza(apertado, modo) || self.avanco_fixo;
         self.avancando = ligado && !self.pausada && !self.rewind.voltando();
         self.avancando
+    }
+
+    /// Liga ou desliga o fast-forward pelo menu, e diz como ficou.
+    ///
+    /// **Um interruptor à parte, e não o do atalho.** Um item de menu não se segura: entregar ao
+    /// atalho um "apertado" contínuo ligaria no modo de segurar, mas no de alternar viraria um
+    /// toque só, e soltar não desligaria. O fixo vale por cima dos dois modos, e o atalho
+    /// continua funcionando como sempre.
+    pub fn alterna_o_avanco_fixo(&mut self) -> bool {
+        self.avanco_fixo = !self.avanco_fixo;
+        self.avanco_fixo
+    }
+
+    pub fn avanco_fixo(&self) -> bool {
+        self.avanco_fixo
     }
 
     /// O que a janela escreve por cima do jogo enquanto ele avança, ou nada. `virgula` é o

@@ -84,6 +84,9 @@ pub struct DebugView {
     pub memory: bool,
     /// O gráfico com a história recente.
     pub timeline: bool,
+    /// A caixa do canto de cima à direita, por cima do jogo: quadros por segundo, velocidade e
+    /// onde o jogo desenha. Não depende do painel, que é uma faixa embaixo e encolhe o jogo.
+    pub metricas: bool,
     /// A janela separada com o log da execução.
     pub log: bool,
     /// Grava cada execução num arquivo próprio, com carimbo de hora em cada linha. Ver
@@ -106,6 +109,7 @@ impl Default for DebugView {
             clock: true,
             memory: true,
             timeline: true,
+            metricas: false,
             log: false,
             gravar_sessao: false,
             nivel_de_log: "aviso".to_string(),
@@ -118,8 +122,17 @@ impl Default for DebugView {
 pub struct Graphics {
     /// Como a janela principal abre.
     pub janela: ModoDaJanela,
-    /// Como a janela do jogo abre.
+    /// Como a janela do jogo abre. Com o jogo na janela principal, é como ela fica enquanto ele
+    /// roda; fechado o jogo, ela volta ao que era.
     pub janela_do_jogo: ModoDaJanela,
+    /// O jogo numa janela só dele, como até a 0.4.3, em vez de desenhado na principal no lugar da
+    /// biblioteca. O "Render to Separate Window" do PCSX2. Vale no próximo jogo aberto: um jogo
+    /// rodando não troca de janela.
+    pub jogo_separado: bool,
+    /// Perguntar antes de fechar o jogo — pelo Esc, pelo menu, pela barra ou pelo fechar da
+    /// janela —, como o "Confirm Shutdown" do PCSX2. Um Esc a mais não joga fora o que não foi
+    /// salvo. A Z-Wheel e o jogo que sai sozinho fecham sem perguntar.
+    pub confirmar_ao_fechar: bool,
     /// O tamanho em que a janela principal estava quando foi fechada, em pontos.
     ///
     /// `None` é o padrão de fábrica (960×720). Só vale em modo janela: maximizada ou em tela
@@ -223,6 +236,8 @@ impl Default for Graphics {
         Self {
             janela: ModoDaJanela::Maximizada,
             janela_do_jogo: ModoDaJanela::Maximizada,
+            jogo_separado: false,
+            confirmar_ao_fechar: true,
             tamanho_da_janela: None,
             tamanho_da_janela_do_jogo: None,
             scaling: Scaling::default(),
@@ -276,6 +291,9 @@ impl Default for Audio {
 pub struct Settings {
     /// Idioma da interface. `None` significa "o do sistema".
     pub language: Option<String>,
+    /// O tema da interface, pela chave do arquivo (`rubi`). `None` é a paleta do sistema, que era
+    /// a única até os temas existirem. Ver [`crate::ui::temas`].
+    pub tema: Option<String>,
     /// Onde procurar os jogos.
     pub roms_dir: Option<PathBuf>,
     /// O pacote da Z-Wheel: abre pela barra de cima e empresta as capas à biblioteca.
@@ -287,6 +305,8 @@ pub struct Settings {
     /// Como a biblioteca mostra os jogos.
     pub biblioteca: ModoDaBiblioteca,
     pub movimento: Movimento,
+    /// As barras da janela principal que se escondem pelo menu Exibir.
+    pub barras: Barras,
     pub controles_na_tela: ControlesNaTela,
     pub graphics: Graphics,
     pub velocidade: Velocidade,
@@ -544,6 +564,24 @@ impl Default for Discord {
     }
 }
 
+/// As barras da janela principal, como o PCSX2 deixa esconder: a de ferramentas, embaixo do menu,
+/// e a de status, no pé da janela. As duas aparecem de fábrica.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Barras {
+    pub ferramentas: bool,
+    pub status: bool,
+}
+
+impl Default for Barras {
+    fn default() -> Self {
+        Self {
+            ferramentas: true,
+            status: true,
+        }
+    }
+}
+
 /// O controle de movimento, fora do mapeamento de cada porta.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -734,6 +772,8 @@ impl ConfigDoJogo {
             graphics: Graphics {
                 janela: janela.janela,
                 janela_do_jogo: janela.janela_do_jogo,
+                jogo_separado: janela.jogo_separado,
+                confirmar_ao_fechar: janela.confirmar_ao_fechar,
                 tamanho_da_janela: janela.tamanho_da_janela,
                 tamanho_da_janela_do_jogo: janela.tamanho_da_janela_do_jogo,
                 gpu_present: janela.gpu_present,
@@ -959,6 +999,7 @@ mod tests {
 
         let settings = Settings {
             language: Some("pt-BR".into()),
+            tema: Some("esmeralda".into()),
             roms_dir: Some(PathBuf::from("/jogos/zeebo")),
             z_wheel_path: Some(PathBuf::from("/jogos/Z-Wheel.zip")),
             screenshots_dir: Some(PathBuf::from("/imagens/zeebo")),
@@ -976,6 +1017,10 @@ mod tests {
             biblioteca: ModoDaBiblioteca::Slider,
             movimento: Movimento {
                 aviso_de_calibracao: false,
+            },
+            barras: Barras {
+                ferramentas: false,
+                status: true,
             },
             controles_na_tela: ControlesNaTela {
                 modo: ModoDosControlesNaTela::Nunca,
@@ -1008,6 +1053,7 @@ mod tests {
             },
             debug: DebugView {
                 overlay: true,
+                metricas: true,
                 ..DebugView::default()
             },
             audio: Audio {
@@ -1162,6 +1208,16 @@ mod tests {
             Atalhos::SALVAR_ESTADO_PADRAO
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Quem vem da 0.4.x não tinha a opção, e passa a jogar na janela principal: é a repaginada
+    /// que todo mundo vê. A janela separada continua a um clique, em Gráficos.
+    #[test]
+    fn um_arquivo_de_antes_joga_na_janela_principal() {
+        let antigo: Settings =
+            serde_json::from_str(r#"{ "graphics": { "janela_do_jogo": "tela_cheia" } }"#).unwrap();
+        assert!(!antigo.graphics.jogo_separado);
+        assert_eq!(antigo.graphics.janela_do_jogo, ModoDaJanela::TelaCheia);
     }
 
     #[test]
