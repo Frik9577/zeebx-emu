@@ -227,7 +227,7 @@
   "graphics.window.maximized": "Maximizada",
   "graphics.window.windowed": "En ventana",
   "graphics.separate_window": "Juego en una ventana aparte",
-  "graphics.separate_window.hint": "Desactivado, el juego aparece en la ventana principal, en lugar de la biblioteca, y cerrarlo trae la biblioteca de vuelta. Activado, se abre en una ventana propia, como hasta la 0.4.3. Aplica para el próximo juego.",
+  "graphics.separate_window.hint": "Desactivado, el juego aparece en la ventana principal, en lugar de la biblioteca, y cerrarlo trae la biblioteca de vuelta. Activado, se abre en una ventana propia, como hasta la 0.4.2. Aplica para el próximo juego.",
   "graphics.confirm_close": "Preguntar antes de cerrar el juego",
   "graphics.confirm_close.hint": "Esc, Cerrar en el menú y en la barra, y cerrar la ventana preguntan antes, con el juego en pausa mientras la pregunta está abierta. La Z-Wheel y el juego que se cierra solo no preguntan.",
   "language.name": "Español (México)",

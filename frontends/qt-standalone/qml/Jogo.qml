@@ -3,7 +3,7 @@ import QtQuick.Window
 
 import zeebx
 
-// A janela separada do jogo, a única até a 0.4.3, para quem ligou `graphics.jogo_separado`. O
+// A janela separada do jogo, a única até a 0.4.2, para quem ligou `graphics.jogo_separado`. O
 // jogo em si mora no `PalcoDoJogo`, o mesmo que a janela principal usa. Ela só é mostrada depois
 // de a biblioteca abrir um jogo, e fechá-la fecha o jogo.
 Window {

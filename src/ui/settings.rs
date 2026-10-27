@@ -125,7 +125,7 @@ pub struct Graphics {
     /// Como a janela do jogo abre. Com o jogo na janela principal, é como ela fica enquanto ele
     /// roda; fechado o jogo, ela volta ao que era.
     pub janela_do_jogo: ModoDaJanela,
-    /// O jogo numa janela só dele, como até a 0.4.3, em vez de desenhado na principal no lugar da
+    /// O jogo numa janela só dele, como até a 0.4.2, em vez de desenhado na principal no lugar da
     /// biblioteca. O "Render to Separate Window" do PCSX2. Vale no próximo jogo aberto: um jogo
     /// rodando não troca de janela.
     pub jogo_separado: bool,
