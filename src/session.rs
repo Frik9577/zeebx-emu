@@ -10,10 +10,11 @@ use std::time::{Duration, Instant};
 
 /// No desktop e no core nativo a sessão recompila os blocos. No `wasm32` o bloco emitido não
 /// roda no navegador. No iOS o sistema recusa a página executável que o Dynarmic aloca — o
-/// simulador também é `TARGET_OS_IPHONE`. Nos dois, o interpretador ocupa o mesmo lugar.
-#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+/// simulador também é `TARGET_OS_IPHONE`. Na Vita o host é Cortex-A9 e o dynarmic não emite
+/// ARMv7. Nesses três, o interpretador ocupa o mesmo lugar.
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "vita")))]
 use crate::cpu::dynarmic::DynarmicCpu as CpuDaSessao;
-#[cfg(any(target_arch = "wasm32", target_os = "ios"))]
+#[cfg(any(target_arch = "wasm32", target_os = "ios", target_os = "vita"))]
 use crate::cpu::interpretador::Interpretador as CpuDaSessao;
 use crate::input::Pad;
 use crate::library;
@@ -1794,6 +1795,14 @@ impl Session {
             _ => None,
         };
         (self.machine.fault_regs(), self.machine.fault_stack(), lr)
+    }
+
+    /// A textura do quadro na placa. Ver [`Machine::textura_do_quadro`].
+    pub fn textura_do_quadro(&self) -> Option<u32> {
+        match self.intermediario {
+            Some(_) => None,
+            None => self.machine.textura_do_quadro(),
+        }
     }
 
     /// O quadro 3D na resolução interna, quando é ele que está à mostra. Ver

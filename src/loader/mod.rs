@@ -44,6 +44,14 @@ pub const MODULE_BSS_SLACK: usize = 1024 * 1024;
 /// (`docs/01-hardware.md`), e o tamanho aqui é escolha nossa — só precisa ser folgado o bastante
 /// para o jogo reconhecer o aparelho.
 ///
+/// Na Vita o processo inteiro cabe em 232 MiB, e o `Vec` zerado é reservado de verdade:
+/// a newlib não tem o overcommit do desktop. Com 64 MiB aqui, o quadro seguinte do
+/// frontend não achava o bloco temporário de ~1,2 MiB (640×480 em 32 bits): o vitaGL
+/// copia esse ponteiro mesmo quando a alocação volta nula, e o Zeetris, já aberto,
+/// morreu num data abort dentro do `sceClibMemcpy`. 48 MiB ainda é o heap que a
+/// Z-Wheel lê como "quanto há livre". A região interna soma mais 16 MiB reservados no
+/// aparelho. Não medi se 48 basta para o Quake nele.
+///
 /// **Medido em 22/09/2026, e o número ficou:** dobrar para 128 MB não move a Z-Wheel. Ela aloca
 /// ~64 MiB no próprio pool (o `memcheck` dela imprime `Free(67001392)`, o mesmo número nos dois
 /// tamanhos) e depois pede **o total que sobra** — 67 001 488 com 64 MB, 134 110 352 com 128 MB.
@@ -51,7 +59,11 @@ pub const MODULE_BSS_SLACK: usize = 1024 * 1024;
 /// alvo. O que ficou dessa medição é a contabilidade honesta de "quanto há livre": ver
 /// [`crate::brew::heap::Heap::maior_bloco`].
 pub const HEAP_BASE: u32 = 0x1000_0000;
-pub const HEAP_SIZE: usize = 64 * 1024 * 1024;
+pub const HEAP_SIZE: usize = if cfg!(target_os = "vita") {
+    48 * 1024 * 1024
+} else {
+    64 * 1024 * 1024
+};
 /// Pilha. `sp` começa no topo porque a pilha do ARM cresce para baixo.
 pub const STACK_BASE: u32 = 0x2000_0000;
 pub const STACK_SIZE: usize = 1024 * 1024;
@@ -90,7 +102,8 @@ pub const SURFACE_SIZE: usize = 8 * 1024 * 1024;
 /// heap: lá é o sistema que aloca em nome dele, e o tamanho sai do jogo, não de nós.
 ///
 /// 16 MB porque o `IPeek` reserva o tamanho da fonte inteira e cada thread leva no mínimo
-/// 64 KB. A região é zerada e só ocupa o que for tocado.
+/// 64 KB. No desktop a região é zerada e só ocupa o que for tocado. Na Vita o bloco inteiro
+/// é reservado na largada: a newlib não entrega página sob demanda.
 pub const INTERNAL_BASE: u32 = 0x3400_0000;
 pub const INTERNAL_SIZE: usize = 16 * 1024 * 1024;
 
