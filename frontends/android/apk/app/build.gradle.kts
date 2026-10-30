@@ -16,7 +16,9 @@ android {
         versionCode = 8
         versionName = "0.5.1"
         ndk {
-            abiFilters += "arm64-v8a"
+            // O `compilar.sh` só deixa em `jniLibs` a ABI pedida (`ZEEBX_ANDROID_ABI`), então
+            // cada APK sai com uma biblioteca só. Listar as duas aqui não faz uma APK levar as duas.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
     }
 

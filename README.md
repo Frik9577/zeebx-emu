@@ -160,7 +160,8 @@ São dois formatos em cada um dos quatro sistemas, e o nome do arquivo diz qual 
 | `zeebx-standalone-qt-windows-x86_64-setup.exe` | idem, no Windows |
 | `zeebx-standalone-qt-macos-arm64.dmg`, `-x86_64.dmg` | idem, nos dois Macs |
 | `zeebx-headless-<sistema>.zip` | o binário sem interface, com o `config.ini` e o leia-me |
-| `zeebx-android-arm64-v8a.apk` | o aplicativo de Android |
+| `zeebx-android-arm64-v8a.apk` | o aplicativo de Android (64 bits, com JIT) |
+| `zeebx-android-armeabi-v7a.apk` | o aplicativo de Android para ARMv7 (32 bits, interpretador) |
 | `zeebx-ios-simulator.zip` | o simulador e o leia-me |
 | `zeebx-ios.zip` | o IPA do AltStore clássico e o leia-me |
 

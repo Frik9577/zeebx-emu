@@ -136,6 +136,25 @@ O script espera a toolchain no `$HOME`, sem `sudo`:
 Os caminhos são ajustáveis por ambiente: `ANDROID_SDK_HOME`, `ANDROID_NDK_VERSAO`, `JAVA_HOME`,
 `GRADLE`, `ZEEBX_ANDROID_ABI`.
 
+## ARMv7 (`armeabi-v7a`)
+
+```
+rustup target add armv7-linux-androideabi
+ZEEBX_ANDROID_ABI=armeabi-v7a ./frontends/android/compilar.sh --apk
+```
+
+A APK sai como `zeebx-android-armeabi-v7a.apk`, com só a ABI de 32 bits dentro.
+
+**O núcleo nessa ABI é o interpretador, não o JIT.** O dynarmic só emite x86_64 e AArch64, então
+em `cfg(all(target_os = "android", target_arch = "arm"))` o `BackendPadrao` e a `session` usam
+`cpu::interpretador::Interpretador` — o mesmo que a Vita e o iOS já usam. O desenho continua na
+placa (EGL/OpenGL ES), como no arm64.
+
+**Não foi medido.** Esta ABI foi ligada sem compilar para o alvo nem rodar num aparelho ARMv7: a
+velocidade do interpretador num Cortex-A7/A9 real é desconhecida, e jogos 3D pesados
+tendem a ficar abaixo de tempo real. Quem tiver o aparelho deve rodar um jogo leve e o painel de
+velocidade antes de confiar nela.
+
 ## Duas pedras no caminho, e por que elas existem
 
 **O CMake não achava o NDK.** O `dynarmic` compila C++ por CMake, e o

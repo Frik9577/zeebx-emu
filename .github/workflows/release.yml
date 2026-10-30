@@ -8,7 +8,8 @@
 #
 #   zeebx-standalone-qt-linux-x86_64.deb     o emulador com a interface Qt, a principal, para instalar
 #   zeebx-headless-linux-x86_64.zip          o binário sem interface, para quem tem frontend próprio
-#   zeebx-android-arm64-v8a.apk              o aplicativo de Android
+#   zeebx-android-arm64-v8a.apk              o aplicativo de Android (64 bits)
+#   zeebx-android-armeabi-v7a.apk            o aplicativo de Android para ARMv7 (32 bits, interpretador)
 #   zeebx-ios-simulator.zip                  o aplicativo de iOS, para o simulador, com o leia-me
 #   zeebx-ios.zip                            o IPA para o AltStore clássico, com o leia-me
 #   zeebx_libretro-linux-aarch64.zip         o core Libretro, com o `.info`, para RetroArch
@@ -142,11 +143,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Uma ABI só, e é o que o `apk/app/build.gradle.kts` filtra. Acrescentar outra é mexer
-        # nos dois lugares, não só aqui.
+        # Cada APK leva uma ABI só: o `compilar.sh` deixa em `jniLibs` apenas a pedida. O
+        # armeabi-v7a roda no interpretador, porque o dynarmic não emite ARMv7.
         include:
           - abi: arm64-v8a
             alvo: aarch64-linux-android
+          - abi: armeabi-v7a
+            alvo: armv7-linux-androideabi
     steps:
       - uses: actions/checkout@v5
 

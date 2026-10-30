@@ -1,7 +1,7 @@
 # Compila o núcleo para Android e monta a APK, sem esperar a tag.
 #
 # O `release.yml` monta a mesma APK, mas só no dia da tag e junto com tudo o mais. Aqui a APK sai
-# sozinha, à mão, e com duas conferências que a release não faz: a `.so` de dentro é AArch64 e a
+# sozinha, à mão, e com duas conferências que a release não faz: a `.so` de dentro é da arquitetura certa e a
 # ABI empacotada é a que se pediu. Um APK que monta mas leva a biblioteca errada instala e quebra
 # no aparelho, e isso é caro de descobrir depois da tag.
 #
@@ -28,11 +28,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Uma ABI só, e é o que o `apk/app/build.gradle.kts` filtra. Acrescentar outra é mexer
-        # nos dois lugares, não só aqui.
+        # Cada APK leva uma ABI só: o `compilar.sh` deixa em `jniLibs` apenas a pedida, e o
+        # `apk/app/build.gradle.kts` aceita as duas. No armeabi-v7a o dynarmic não entra (ele não
+        # emite ARMv7) e o núcleo é o interpretador.
         include:
           - abi: arm64-v8a
             alvo: aarch64-linux-android
+            arquitetura: 'ARM aarch64|aarch64'
+            outras: 'lib/(x86|x86_64|armeabi-v7a)/'
+          - abi: armeabi-v7a
+            alvo: armv7-linux-androideabi
+            arquitetura: 'ELF 32-bit.*ARM'
+            outras: 'lib/(x86|x86_64|arm64-v8a)/'
     steps:
       - uses: actions/checkout@v5
 
@@ -88,18 +95,18 @@ jobs:
           apk=frontends/android/apk/app/build/outputs/apk/debug/zeebx-android-${{ matrix.abi }}.apk
           ls -la "$apk"
           unzip -l "$apk" | grep "lib/${{ matrix.abi }}/"
-          if unzip -l "$apk" | grep -qE 'lib/(x86|x86_64|armeabi-v7a)/'; then
+          if unzip -l "$apk" | grep -qE '${{ matrix.outras }}'; then
             echo "a APK levou ABI que não é a pedida"
             exit 1
           fi
           mkdir -p prova && unzip -o -j "$apk" "lib/${{ matrix.abi }}/*.so" -d prova > /dev/null
           for so in prova/*.so; do
-            file "$so" | grep -Eiq 'ARM aarch64|aarch64' || {
-              echo "$so não é AArch64"
+            file "$so" | grep -Eiq '${{ matrix.arquitetura }}' || {
+              echo "$so não é da arquitetura de ${{ matrix.abi }}"
               exit 1
             }
           done
-          echo "as bibliotecas da APK são AArch64, e só há a ABI ${{ matrix.abi }}"
+          echo "as bibliotecas da APK são de ${{ matrix.abi }}, e só há essa ABI"
 
       - uses: actions/upload-artifact@v4
         with:
